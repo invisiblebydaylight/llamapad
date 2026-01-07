@@ -1,0 +1,57 @@
+import Combine
+import SwiftUI
+
+class ModelConfiguration: ObservableObject, Codable {
+    @Published var modelPath: String = ""
+    @Published var modelBookmark: Data? = nil
+    @Published var systemMessage: String = "You are a helpful assistant."
+    @Published var chatTemplate: String? = nil
+    @Published var contextLength: Int = 4096
+    @Published var maxGenerationLength: Int = 0
+    @Published var layerCountToOffload: Int = 99
+    @Published var customSampler: SamplerSettings = SamplerSettings()
+
+    enum CodingKeys: String, CodingKey {
+        case modelPath, modelBookmark, systemMessage, chatTemplate, contextLength, maxGenerationLength, layerCountToOffload, customSampler
+    }
+
+    init() {}
+
+    required convenience init(from decoder: Decoder) throws {
+        self.init()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        modelPath = try container.decode(String.self, forKey: .modelPath)
+        modelBookmark = try container.decodeIfPresent(Data.self, forKey: .modelBookmark)
+        systemMessage = try container.decode(String.self, forKey: .systemMessage)
+        chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
+        contextLength = try container.decode(Int.self, forKey: .contextLength)
+        maxGenerationLength = try container.decode(Int.self, forKey: .maxGenerationLength)
+        layerCountToOffload = try container.decode(Int.self, forKey: .layerCountToOffload)
+        customSampler = try container.decode(SamplerSettings.self, forKey: .customSampler)
+    }
+    
+    // deep copy initializer
+    init(_ other: ModelConfiguration) {
+        self.modelPath = other.modelPath
+        self.modelBookmark = other.modelBookmark
+        self.systemMessage = other.systemMessage
+        self.chatTemplate = other.chatTemplate
+        self.contextLength = other.contextLength
+        self.maxGenerationLength = other.maxGenerationLength
+        self.layerCountToOffload = other.layerCountToOffload
+        self.customSampler = other.customSampler
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(modelPath, forKey: .modelPath)
+        try container.encode(modelBookmark, forKey: .modelBookmark)
+        try container.encode(systemMessage, forKey: .systemMessage)
+        try container.encode(chatTemplate, forKey: .chatTemplate)
+        try container.encode(contextLength, forKey: .contextLength)
+        try container.encode(maxGenerationLength, forKey: .maxGenerationLength)
+        try container.encode(layerCountToOffload, forKey: .layerCountToOffload)
+        try container.encode(customSampler, forKey: .customSampler)
+    }
+}
+

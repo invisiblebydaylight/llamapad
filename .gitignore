@@ -1,0 +1,8 @@
+.DS_Store
+chats
+xcuserdata
+xcshareddata/xcschemes/
+*.xcscheme
+build
+DerivedData
+todo.md
