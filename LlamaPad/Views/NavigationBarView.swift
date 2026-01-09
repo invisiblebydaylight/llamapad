@@ -22,7 +22,7 @@ struct NavigationBarView: View {
                                 isPresented: $isShowingDeleteConfirmation) {
                 Button("Clear Chat History", role: .destructive) {
                     // remove messages and save the blank chatlog
-                    appState.messageLog.removeAll()
+                    appState.removeAllMessages()
                     try? PersistenceService.saveChatLog(appState.messageLog)
                 }
             }

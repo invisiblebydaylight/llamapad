@@ -36,7 +36,7 @@ struct ContentView: View {
                     }
                 )
                 
-                if let llamaContext = appState.llamaContext {
+                if appState.llamaContext != nil {
                     if let config = appState.modelConfig {
                         let promptTokens = appState.lastPromptTokenCount
                         let usagePercentage = Double(promptTokens) / Double(config.contextLength) * 100
@@ -49,6 +49,10 @@ struct ContentView: View {
                             
                             Spacer()
                         }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                         .padding(.bottom, 8)
                     }
                 }

@@ -326,7 +326,7 @@ actor LlamaContext {
 
     // converts an array of Message objects to a formatted prompt using the model's chat template,
     // but not any embedded jinja code.
-    func formatPrompt(messages: [(sender: MessageSender, content: String)], template: String?) throws -> String {
+    func formatPrompt(messages: [(sender: MessageSender, content: String)], systemMessage: String?, template: String?) throws -> String {
         // convert Message objects into a C llama_chat_message array and setup the
         // defer deallocation function immediately so that this will run even if
         // the function bails out early from throwing an exception
@@ -336,6 +336,18 @@ actor LlamaContext {
                 free(UnsafeMutablePointer(mutating: msg.role))
                 free(UnsafeMutablePointer(mutating: msg.content))
             }
+        }
+        
+        // if a system message is provided, add it first with the "system" role
+        if let sysMsg = systemMessage, !sysMsg.isEmpty {
+            guard let roleCString = strdup("system") else {
+                throw LlamaError.memoryAllocationFailed
+            }
+            guard let contentCString = strdup(sysMsg) else {
+                free(roleCString) // no strings left behind...
+                throw LlamaError.memoryAllocationFailed
+            }
+            chatMessages.append(llama_chat_message(role: roleCString, content: contentCString))
         }
         
         for message in messages {

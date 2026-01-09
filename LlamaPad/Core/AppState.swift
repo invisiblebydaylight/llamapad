@@ -65,11 +65,23 @@ class AppState: ObservableObject {
         self.showingErrorAlert = true
     }
 
+    /// unloads any loaded model and then reloads the model specified in the configuration
     func reloadModel() async {
         await unloadModel()
         await loadModelFromConfiguration()
-        
-        // if we can build a prompt, then calculate the tokens used for it
+        await calculatePromptTokenCount()
+    }
+    
+    /// removes all the messages in the `messageLog` and resets the prompt token counter on a background Task
+    func removeAllMessages() {
+        messageLog.removeAll()
+        Task {
+            await calculatePromptTokenCount()
+        }
+    }
+
+    /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
+    private func calculatePromptTokenCount() async {
         let prompt = await buildPrompt()
         if let prompt {
             self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
@@ -175,9 +187,11 @@ class AppState: ObservableObject {
         // transform it into a Sendable tuple
         let processedMessages = await prepareMessagesForPrompt()
         
-        let prompt: String
         do {
-            return try await llamaContext.formatPrompt(messages: processedMessages, template: config.chatTemplate)
+            return try await llamaContext.formatPrompt(
+                messages: processedMessages,
+                systemMessage: config.systemMessage,
+                template: config.chatTemplate)
         } catch {
             return nil
         }
@@ -185,10 +199,6 @@ class AppState: ObservableObject {
 
     // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse() async {
-        guard let config = modelConfig else {
-            reportError("Error: No configuration available; hit that gear icon and setup the app.")
-            return
-        }
         guard let llamaContext else {
             reportError("Error: Model not loaded and it really should be at this point... Interesting.")
             return
