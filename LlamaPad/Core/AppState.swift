@@ -30,6 +30,8 @@ class AppState: ObservableObject {
     
     /// whether or not to show the error alert with the lastErrorMessage text
     @Published var showingErrorAlert = false
+    
+    @Published var lastPromptTokenCount: Int = 0
 
     init() {
         // start off by loading the configuration file first, if it exists
@@ -37,7 +39,7 @@ class AppState: ObservableObject {
             modelConfig = try PersistenceService.loadConfiguration()
             if modelConfig != nil {
                 Task {
-                    await loadModelFromConfiguration()
+                    await reloadModel()
                 }
             }
         } catch PersistenceError.fileNotFound {
@@ -66,6 +68,12 @@ class AppState: ObservableObject {
     func reloadModel() async {
         await unloadModel()
         await loadModelFromConfiguration()
+        
+        // if we can build a prompt, then calculate the tokens used for it
+        let prompt = await buildPrompt()
+        if let prompt {
+            self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
+        }
     }
 
     private func loadModelFromConfiguration() async {
@@ -153,6 +161,28 @@ class AppState: ObservableObject {
         #endif
     }
 
+    /// builds the prompt for text generation based off the loaded model, the configuration and the messages.
+    /// if it's unable to build a prompt, `nil` is returned
+    private func buildPrompt() async -> String? {
+        guard let config = modelConfig else {
+            return nil
+        }
+        guard let llamaContext else {
+            return nil
+        }
+        
+        // prepare messages (remove thinking blocks, filter by context) and
+        // transform it into a Sendable tuple
+        let processedMessages = await prepareMessagesForPrompt()
+        
+        let prompt: String
+        do {
+            return try await llamaContext.formatPrompt(messages: processedMessages, template: config.chatTemplate)
+        } catch {
+            return nil
+        }
+    }
+
     // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse() async {
         guard let config = modelConfig else {
@@ -173,15 +203,10 @@ class AppState: ObservableObject {
             self.shouldStopGenerating = false
         }
         
-        // prepare messages (remove thinking blocks, filter by context) and
-        // transform it into a Sendable tuple
-        let processedMessages = await prepareMessagesForPrompt()
-        
-        let prompt: String
-        do {
-            prompt = try await llamaContext.formatPrompt(messages: processedMessages, template: config.chatTemplate)
-        } catch {
-            reportError("Prompt formatting failed: \(error.localizedDescription)")
+        // build out the prompt
+        let prompt = await buildPrompt()
+        guard let prompt else {
+            reportError("Failed to build the prompt from the message log. Aborting generation.")
             return
         }
         
@@ -200,7 +225,7 @@ class AppState: ObservableObject {
             self.messageLog.removeLast()
             return
         }
-        let promptTokenCount = await llamaContext.getTokenCount()
+        self.lastPromptTokenCount =  await llamaContext.getTokenCount()
         
         // generate tokens and update UI incrementally
         var generatedTokens = 0
@@ -232,12 +257,12 @@ class AppState: ObservableObject {
         let t_heat = Double(timeToFirstToken - t_start) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
         let t_generation = Double(t_end - timeToFirstToken) / NS_PER_S
-        let prompt_tps = Double(promptTokenCount) / t_heat
+        let prompt_tps = Double(self.lastPromptTokenCount) / t_heat
         let generation_tps = Double(generatedTokens-1) / t_generation
         
         print("Info: Generation complete:")
         print("  Time to first token: \(t_heat)s")
-        print("  Prompt speeds: \(promptTokenCount) tokens ; \(prompt_tps) t/s")
+        print("  Prompt speeds: \(self.lastPromptTokenCount) tokens ; \(prompt_tps) t/s")
         print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
         
         do {
@@ -248,8 +273,12 @@ class AppState: ObservableObject {
     }
     
     // rough token estimation (1 token ≈ 4 chars for English text)
-    private func estimateTokenCount(for text: String) -> Int {
-        return max(1, text.count / 4)
+    func getTokenCount(for text: String) async -> Int {
+        guard let llamaContext = llamaContext else {
+            return max(1, text.count / 4)
+        }
+        
+        return await llamaContext.tokenize(text: text, addBOS: false).count
     }
     
     // prepares messages for prompt by removing thinking blocks and filtering by context size
@@ -272,7 +301,7 @@ class AppState: ObservableObject {
             // skip empty messages (e.g., thinking-only partial messages)
             guard !contentForPrompt.isEmpty else { continue }
             
-            let estimatedTokens = estimateTokenCount(for: contentForPrompt)
+            let estimatedTokens = await getTokenCount(for: contentForPrompt)
             
             // stop if adding this message would exceed context
             if totalTokensUsed + estimatedTokens > availableTokens {

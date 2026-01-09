@@ -13,8 +13,11 @@ struct ConfigurationView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     
-    // Draft configuration - all edits happen here
+    /// Draft configuration - all edits happen here
     @StateObject private var draftConfig: ModelConfiguration
+
+    /// keeps track of the token count for the system message text
+    @State private var systemMessageTokenCount: Int = 0
     
     init(appState: AppState) {
         self.appState = appState
@@ -217,19 +220,27 @@ struct ConfigurationView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         TextEditor(text: $draftConfig.systemMessage)
                             .frame(minHeight: 100)
-                            .overlay(
-                                Text("Enter system message...")
-                                    .foregroundColor(.gray)
-                                    .padding(8)
-                                    .opacity(draftConfig.systemMessage.isEmpty ? 1 : 0),
-                                alignment: .topLeading
-                            )
+                            .listRowSeparator(.hidden)
+                            .scrollContentBackground(.hidden)
+                            .onChange(of: draftConfig.systemMessage) {
+                                Task {
+                                    systemMessageTokenCount = await appState.getTokenCount(for: draftConfig.systemMessage)
+                                }
+                            }
+                            .onAppear(){
+                                Task {
+                                    systemMessageTokenCount = await appState.getTokenCount(for: draftConfig.systemMessage)
+                                }
+                            }
 
                         // Optional: Character counter
-                        Text("\(draftConfig.systemMessage.count) characters")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if systemMessageTokenCount > 0 {
+                            Text("\(systemMessageTokenCount) tokens")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .listRowSeparator(.hidden)
                 } label: {
                     Text("System Message")
                         .onTapGesture {

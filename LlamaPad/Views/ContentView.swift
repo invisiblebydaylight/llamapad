@@ -35,6 +35,23 @@ struct ContentView: View {
                         }
                     }
                 )
+                
+                if let llamaContext = appState.llamaContext {
+                    if let config = appState.modelConfig {
+                        let promptTokens = appState.lastPromptTokenCount
+                        let usagePercentage = Double(promptTokens) / Double(config.contextLength) * 100
+                        HStack {
+                            Spacer()
+                            
+                            HStack(spacing: 12) {
+                                Text("Context used: \(promptTokens)/\(config.contextLength) (\(usagePercentage, specifier: "%.1f")%)")
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.bottom, 8)
+                    }
+                }
             }
             .blur(radius: appState.isLoadingModel ? 3 : 0)
             .allowsHitTesting(!appState.isLoadingModel)

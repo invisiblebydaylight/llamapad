@@ -36,7 +36,7 @@ and runs on the target device.
 ## Known Limitations
 
 * **Warning:** Loading two different,'larger' GGUF models (on my iPad Pro M5, this can be two ~7GB files)
-  will cause your iPad to reboot unless you set `Layers to offload` to `0` in the configuration for the
+  will cause your iPad to reboot unless you set `Layers To Offload` to `0` in the configuration for the
   model. Once you've switched to the different model, you can set the `Layers to offload` back to `999`
   or whatever value you want. See 'Implementation Notes' for more details.
 * Currently doesn't support loading BF16 GGUF files. See 'Implementation Notes' for more details.
