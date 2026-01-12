@@ -89,7 +89,7 @@ struct SamplerSettings : Codable {
     var magic_seed: UInt32 = 0
 }
 
-actor LlamaContext {
+actor LlamaContext: Sendable {
     var isDone: Bool = false
     let contextLength: UInt32
     var numToPredict: Int32 = 512

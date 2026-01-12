@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// This view is the collapsable control that slides out the 'thought process' for the LLM if
+/// thinking tokens were returned.
 struct ThinkingView: View {
     let content: String
     let isThinking: Bool
@@ -47,88 +49,175 @@ struct ThinkingView: View {
             }
         }
     }
-    
 }
 
-// this version of the Message View gets used for messages that do not change
-struct StaticMessageView: View {
-    let message: Message
+/// This view represents a single `Message` to render in the chatlog view.
+struct MessageView: View {
+    @ObservedObject var message: Message
     @State private var isThinkingExpanded: Bool
+    //@State private var isHovering: Bool = false
+    
+    @State private var showTray: Bool = false
+    @State private var hoverTask: Task<Void, Never>?
+
     
     init(message: Message) {
         self.message = message
         _isThinkingExpanded = State(initialValue: message.isThinkingExpanded)
     }
 
-    var body: some View {
-        HStack {
-            if message.sender == .user {
-                Spacer(minLength: 40)
+    private var SidecarTray: some View {
+        HStack(spacing: 8) {
+            Button(action: regenerateButtonAction) {
+                Image(systemName: "arrow.clockwise")
+                    .sidecarTrayButtonStyle(background: .blue, showTray: showTray)
+                    .help("Regenerate")
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                let isThinking = message.parsedContent.thinkingContent != nil && message.parsedContent.responseContent.isEmpty
-                            
-                // show thinking section if it exists and is from AI
-                if message.sender == .ai, let thinking = message.parsedContent.thinkingContent {
-                    ThinkingView(
-                        content: thinking,
-                        isThinking: isThinking,
-                        isExpanded: $isThinkingExpanded)
-                }
-                
-                Text(message.parsedContent.responseContent)
-                    .textSelection(.enabled)
-                    .padding(12)
+            Button(action: editButtonAction) {
+                Image(systemName: "pencil")
+                    .sidecarTrayButtonStyle(background: .blue, showTray: showTray)
+                    .help("Edit")
             }
-            .background(message.sender == .user ? Color.blue : Color.gray.opacity(0.2))
-            .foregroundColor(message.sender == .user ? .white : .primary)
-            .cornerRadius(16)
-
-            if message.sender == .ai {
-                Spacer(minLength: 40)
+            
+            Button(action: deleteButtonAction) {
+                Image(systemName: "trash")
+                    .sidecarTrayButtonStyle(background: .red, showTray: showTray)
+                    .help("Delete")
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 4)
+        .opacity(showTray ? 1.0 : 0.0)
+        .animation(.easeInOut(duration: 0.2), value: showTray)
     }
-}
-
-// this is the editable version of the Message View, which should be used
-// for streaming responses or otherwise providing observation for changes
-struct EditableMessageView: View {
-    @ObservedObject var message: Message
+    
+    private var MessageBubbleContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let isThinking = message.parsedContent.thinkingContent != nil && message.parsedContent.responseContent.isEmpty
+            
+            // show thinking section if it exists and is from AI
+            if message.sender == .ai, let thinking = message.parsedContent.thinkingContent {
+                ThinkingView(
+                    content: thinking,
+                    isThinking: isThinking,
+                    isExpanded: $isThinkingExpanded)
+            }
+            
+            Text(message.parsedContent.responseContent)
+                .textSelection(.enabled)
+                .padding(12)
+        }
+        .background(message.sender == .user ? Color.blue : Color.gray.opacity(0.2))
+        .foregroundColor(message.sender == .user ? .white : .primary)
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16)
+            .stroke(Color.secondary.opacity(showTray ? 1.0 : 0), lineWidth: 1))
+        #if os(iOS)
+        .onTapGesture {
+            withAnimation {
+                showTray = false
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 80)
+                .onChanged { _ in
+                    // we don't change state mid-drag to prevent jitter
+                }
+                .onEnded { value in
+                    if abs(value.translation.width) > 80 {
+                        withAnimation {
+                            showTray.toggle()
+                        }
+                    }
+                }
+        )
+        #endif
+    }
     
     var body: some View {
         HStack {
-            if message.sender == .user {
-                Spacer(minLength: 40)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                let isThinking = message.parsedContent.thinkingContent != nil && message.parsedContent.responseContent.isEmpty
-                            
-                // show thinking section if it exists and is from AI
-                if message.sender == .ai, let thinking = message.parsedContent.thinkingContent {
-                    ThinkingView(
-                        content: thinking,
-                        isThinking: isThinking,
-                        isExpanded: $message.isThinkingExpanded)
+            HStack(alignment: .center, spacing: 0) {
+                // user message alignment
+                if message.sender == .user {
+                    Spacer()
+                    SidecarTray
+                        .padding(.trailing, 8)
+                    MessageBubbleContent
                 }
-                
-                Text(message.parsedContent.responseContent)
-                    .textSelection(.enabled)
-                    .padding(12)
+                // ai message alignment
+                else {
+                    MessageBubbleContent
+                    SidecarTray
+                        .padding(.leading, 8)
+                    Spacer()
+                }
             }
-            .background(message.sender == .user ? Color.blue : Color.gray.opacity(0.2))
-            .foregroundColor(message.sender == .user ? .white : .primary)
-            .cornerRadius(16)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            #if os(macOS)
+            .onHover { hovering in
+                if hovering {
+                    // start a timer, but cancel if they leave quickly
+                    hoverTask?.cancel()
+                    hoverTask = Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        if !Task.isCancelled {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showTray = true
+                            }
+                        }
+                    }
+                } else {
+                    // immediate dismissal if they leave the row
+                    hoverTask?.cancel()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showTray = false
+                    }
+                }
 
-            if message.sender == .ai {
-                Spacer(minLength: 40)
             }
+            #endif
         }
-        .padding(.horizontal)
-        .padding(.vertical, 4)
+    }
+    
+    private func regenerateButtonAction() {
+        // TODO: Implement regenerate logic
+        print("DEBUG: Regenerate tapped for \(message.id)")
+    }
+    
+    private func editButtonAction() {
+        // TODO: Implement edit logic
+        print("DEBUG: Edit tapped for \(message.id)")
+    }
+    
+    private func deleteButtonAction() {
+        // TODO: Implement delete logic
+        print("DEBUG: Delete tapped for \(message.id)")
+    }
+}
+
+extension View {
+    func sidecarTrayButtonStyle(background: Color, showTray: Bool) -> some View {
+        #if os(iOS)
+        self.font(.body)
+            .foregroundColor(.primary)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
+            .background(background.opacity(0.8))
+            .cornerRadius(10)
+        #else
+        self.font(.caption)
+            .foregroundColor(.secondary)
+            .padding(6)
+            .background(
+                Circle()
+                    .fill(Color.clear)
+            )
+            .overlay(
+                Circle()
+                    .stroke(.secondary, lineWidth: !showTray ? 0 : 1)
+            )
+            .contentShape(Circle())
+        #endif
     }
 }

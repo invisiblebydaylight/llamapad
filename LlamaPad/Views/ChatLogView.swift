@@ -33,13 +33,7 @@ struct ChatLogView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(messages) { message in
-                                // use editable view for the last message (might be actively updating)
-                                // use static view for all other messages (completed, won't change)
-                                if message.id == messages.last?.id && message.sender == .ai {
-                                    EditableMessageView(message: message).id(message.id)
-                                } else {
-                                    StaticMessageView(message: message).id(message.id)
-                                }
+                                MessageView(message: message).id(message.id)
                             }
                             // give some space for the scrolling to go past the last message
                             Spacer(minLength: 200)
