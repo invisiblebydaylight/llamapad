@@ -79,6 +79,24 @@ class AppState: ObservableObject {
             await calculatePromptTokenCount()
         }
     }
+    
+    /// removes a specific message in the `messageLog` that matches the `id` passed in
+    func removeMessage(id: UUID) {
+        messageLog.removeAll(where: { $0.id == id })
+        Task {
+            await calculatePromptTokenCount()
+        }
+    }
+    
+    /// Removes the specified message and every message that follows it in the log.
+    func purgeMessages(from id: UUID) {
+        if let index = messageLog.firstIndex(where: { $0.id == id }) {
+            messageLog.removeSubrange(index...)
+            Task {
+                await calculatePromptTokenCount()
+            }
+        }
+    }
 
     /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
     private func calculatePromptTokenCount() async {
@@ -161,6 +179,15 @@ class AppState: ObservableObject {
         currentModelURL = nil
         
         print("Info: Model unloaded and security scope released.")
+    }
+    
+    /// Explicitly persists the current message log to disk.
+    func saveChatLog() {
+        do {
+            try PersistenceService.saveChatLog(messageLog)
+        } catch {
+            reportError("Warning: Failed to save chat log: \(error.localizedDescription)")
+        }
     }
     
     private func validateModelPath(_ path: String) -> Bool {
@@ -275,11 +302,8 @@ class AppState: ObservableObject {
         print("  Prompt speeds: \(self.lastPromptTokenCount) tokens ; \(prompt_tps) t/s")
         print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
         
-        do {
-            try PersistenceService.saveChatLog(messageLog)
-        } catch {
-            reportError("Warning: Failed to save chat log: \(error.localizedDescription)")
-        }
+        // make sure to serialize as the final step so nothing's lost
+        saveChatLog()
     }
     
     // rough token estimation (1 token ≈ 4 chars for English text)

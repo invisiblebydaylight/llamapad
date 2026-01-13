@@ -23,7 +23,7 @@ struct NavigationBarView: View {
                 Button("Clear Chat History", role: .destructive) {
                     // remove messages and save the blank chatlog
                     appState.removeAllMessages()
-                    try? PersistenceService.saveChatLog(appState.messageLog)
+                    appState.saveChatLog()
                 }
             }
 

@@ -66,7 +66,6 @@ extension View {
         self.font(.body)
             .foregroundColor(.primary)
             .padding(.horizontal, 16)
-            .frame(minHeight: 44)
             .background(!armed ? Color.clear : background)
             .cornerRadius(10)
         #else
@@ -82,6 +81,7 @@ extension View {
 
 /// This view represents a single `Message` to render in the chatlog view.
 struct MessageView: View {
+    @ObservedObject var appState: AppState
     @ObservedObject var message: Message
     @State private var isThinkingExpanded: Bool
     @State private var showTray: Bool = false
@@ -89,29 +89,32 @@ struct MessageView: View {
     @State private var armedButton: ArmedButton
 
     
-    init(message: Message) {
+    init(appState: AppState, message: Message) {
         self.message = message
+        self.appState = appState
         armedButton = .None
         _isThinkingExpanded = State(initialValue: message.isThinkingExpanded)
     }
 
     private var SidecarTray: some View {
         HStack(spacing: 8) {
-            Button(action: {
-                if armedButton == .Regenerate {
-                    regenerateButtonAction()
-                    armedButton = .None
-                    showTray = false
-                } else {
-                    armedButton = .Regenerate
+            // only ai messages get the regenerate option...
+            if message.sender == .ai {
+                Button(action: {
+                    if armedButton == .Regenerate {
+                        regenerateButtonAction()
+                        armedButton = .None
+                        showTray = false
+                    } else {
+                        armedButton = .Regenerate
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
+                        .help("Regenerate")
                 }
-            }) {
-                Image(systemName: "arrow.clockwise")
-                    .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
-                    .help("Regenerate")
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            
             Button(action: {
                 if armedButton == .Edit {
                     editButtonAction()
@@ -244,8 +247,15 @@ struct MessageView: View {
     }
     
     private func regenerateButtonAction() {
-        // TODO: Implement regenerate logic
-        print("DEBUG: Regenerate tapped for \(message.id)")
+        guard message.sender == .ai else { return }
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            appState.purgeMessages(from: message.id)
+            appState.saveChatLog()
+            Task {
+                await appState.generateChatResponse()
+            }
+        }
     }
     
     private func editButtonAction() {
@@ -254,8 +264,10 @@ struct MessageView: View {
     }
     
     private func deleteButtonAction() {
-        // TODO: Implement delete logic
-        print("DEBUG: Delete tapped for \(message.id)")
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            appState.messageLog.removeAll(where: { $0.id == message.id })
+            appState.saveChatLog()
+        }
     }
 }
 

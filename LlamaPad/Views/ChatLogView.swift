@@ -33,7 +33,7 @@ struct ChatLogView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(messages) { message in
-                                MessageView(message: message).id(message.id)
+                                MessageView(appState: appState, message: message).id(message.id)
                             }
                             // give some space for the scrolling to go past the last message
                             Spacer(minLength: 200)

@@ -57,7 +57,6 @@ a more robust experience:
 * Multiple model configuration support to make using many models easier.
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
-* Quality of life improvements like editing and deleting messages.
 * Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
   or memory systems.
 
