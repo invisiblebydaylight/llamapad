@@ -51,40 +51,96 @@ struct ThinkingView: View {
     }
 }
 
+/// used to indicate which sidecar tray button is 'armed', or already pressed once.
+enum ArmedButton {
+    case None
+    case Edit
+    case Regenerate
+    case Delete
+}
+
+/// this extention just factors out some styling options for the sidecar tray buttons.
+extension View {
+    func sidecarTrayButtonStyle(background: Color, armed: Bool, showTray: Bool) -> some View {
+        #if os(iOS)
+        self.font(.body)
+            .foregroundColor(.primary)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
+            .background(!armed ? Color.clear : background)
+            .cornerRadius(10)
+        #else
+        self.font(.caption)
+            .foregroundColor(.secondary)
+            .padding(6)
+            .contentShape(Circle())
+            .background(Circle().fill(!armed ? Color.clear : background))
+            .overlay(Circle().stroke(.secondary.opacity(0.6), lineWidth: 1))
+        #endif
+    }
+}
+
 /// This view represents a single `Message` to render in the chatlog view.
 struct MessageView: View {
     @ObservedObject var message: Message
     @State private var isThinkingExpanded: Bool
-    //@State private var isHovering: Bool = false
-    
     @State private var showTray: Bool = false
     @State private var hoverTask: Task<Void, Never>?
+    @State private var armedButton: ArmedButton
 
     
     init(message: Message) {
         self.message = message
+        armedButton = .None
         _isThinkingExpanded = State(initialValue: message.isThinkingExpanded)
     }
 
     private var SidecarTray: some View {
         HStack(spacing: 8) {
-            Button(action: regenerateButtonAction) {
+            Button(action: {
+                if armedButton == .Regenerate {
+                    regenerateButtonAction()
+                    armedButton = .None
+                    showTray = false
+                } else {
+                    armedButton = .Regenerate
+                }
+            }) {
                 Image(systemName: "arrow.clockwise")
-                    .sidecarTrayButtonStyle(background: .blue, showTray: showTray)
+                    .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
                     .help("Regenerate")
             }
+            .buttonStyle(.plain)
             
-            Button(action: editButtonAction) {
+            Button(action: {
+                if armedButton == .Edit {
+                    editButtonAction()
+                    armedButton = .None
+                    showTray = false
+                } else {
+                    armedButton = .Edit
+                }
+            }) {
                 Image(systemName: "pencil")
-                    .sidecarTrayButtonStyle(background: .blue, showTray: showTray)
+                    .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Edit, showTray: showTray)
                     .help("Edit")
             }
-            
-            Button(action: deleteButtonAction) {
+            .buttonStyle(.plain)
+
+            Button(action: {
+                if armedButton == .Delete {
+                    deleteButtonAction()
+                    armedButton = .None
+                    showTray = false
+                } else {
+                    armedButton = .Delete
+                }
+            }) {
                 Image(systemName: "trash")
-                    .sidecarTrayButtonStyle(background: .red, showTray: showTray)
+                    .sidecarTrayButtonStyle(background: .red, armed: armedButton == .Delete, showTray: showTray)
                     .help("Delete")
             }
+            .buttonStyle(.plain)
         }
         .opacity(showTray ? 1.0 : 0.0)
         .animation(.easeInOut(duration: 0.2), value: showTray)
@@ -154,6 +210,13 @@ struct MessageView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
+            .onChange(of: showTray) { _, shown in
+                if !shown {
+                    withAnimation {
+                        armedButton = .None
+                    }
+                }
+            }
             #if os(macOS)
             .onHover { hovering in
                 if hovering {
@@ -196,28 +259,4 @@ struct MessageView: View {
     }
 }
 
-extension View {
-    func sidecarTrayButtonStyle(background: Color, showTray: Bool) -> some View {
-        #if os(iOS)
-        self.font(.body)
-            .foregroundColor(.primary)
-            .padding(.horizontal, 16)
-            .frame(minHeight: 44)
-            .background(background.opacity(0.8))
-            .cornerRadius(10)
-        #else
-        self.font(.caption)
-            .foregroundColor(.secondary)
-            .padding(6)
-            .background(
-                Circle()
-                    .fill(Color.clear)
-            )
-            .overlay(
-                Circle()
-                    .stroke(.secondary, lineWidth: !showTray ? 0 : 1)
-            )
-            .contentShape(Circle())
-        #endif
-    }
-}
+
