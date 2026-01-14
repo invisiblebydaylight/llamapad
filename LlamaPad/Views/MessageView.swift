@@ -68,6 +68,7 @@ extension View {
         self.font(.body)
             .foregroundColor(.primary)
             .padding(.horizontal, 16)
+            .frame(minHeight: 44)
             .background(!armed ? Color.clear : background)
             .cornerRadius(10)
         #else
@@ -214,8 +215,8 @@ struct MessageView: View {
                     .scrollContentBackground(.hidden)
                     .padding(4)
                     .background(.clear)
-                    .onKeyPress(.return) {
-                        if NSEvent.modifierFlags.contains(.command) {
+                    .onKeyPress(keys: [.return]) { press in
+                        if press.modifiers.contains(.command) {
                             commitEditButtonAction()
                             isEditing = false
                             showTray = false
