@@ -57,6 +57,8 @@ enum ArmedButton {
     case Edit
     case Regenerate
     case Delete
+    case Cancel
+    case Commit
 }
 
 /// this extention just factors out some styling options for the sidecar tray buttons.
@@ -83,10 +85,26 @@ extension View {
 struct MessageView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var message: Message
+    
+    /// whether or not the thinking view is expanded and visible
     @State private var isThinkingExpanded: Bool
+    
+    /// whether to show the sidecar tray buttons or not
     @State private var showTray: Bool = false
+    
+    /// the task that ends up eventually toggling `showTray` after some delay; can get cancelled
     @State private var hoverTask: Task<Void, Never>?
+    
+    /// the button that is 'armed', i.e. already pressed once
     @State private var armedButton: ArmedButton
+
+    /// whether or not the user is editing this message
+    @State private var isEditing: Bool = false
+    
+    /// the drafted contents of the possible edit; not confirmed  yet
+    @State private var draftContent: String = ""
+    
+    @FocusState private var isEditorFocused: Bool
 
     
     init(appState: AppState, message: Message) {
@@ -98,52 +116,79 @@ struct MessageView: View {
 
     private var SidecarTray: some View {
         HStack(spacing: 8) {
-            // only ai messages get the regenerate option...
-            if message.sender == .ai {
+            if isEditing {
+                // These are the CANCEL and COMMIT buttons shown when editing
                 Button(action: {
-                    if armedButton == .Regenerate {
-                        regenerateButtonAction()
-                        armedButton = .None
-                        showTray = false
-                    } else {
-                        armedButton = .Regenerate
-                    }
+                    isEditing = false
+                    showTray = false
+                    armedButton = .None
                 }) {
-                    Image(systemName: "arrow.clockwise")
-                        .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
-                        .help("Regenerate")
+                    Image(systemName: "xmark")
+                        .sidecarTrayButtonStyle(background: .gray, armed: armedButton == .Cancel, showTray: showTray)
+                        .help("Cancel")
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    commitEditButtonAction()
+                    isEditing = false
+                    showTray = false
+                    armedButton = .None
+                }) {
+                    Image(systemName: "checkmark")
+                        .sidecarTrayButtonStyle(background: .green, armed: armedButton == .Commit, showTray: showTray)
+                        .help("Save Edit")
                 }
                 .buttonStyle(.plain)
             }
-            Button(action: {
-                if armedButton == .Edit {
-                    editButtonAction()
-                    armedButton = .None
-                    showTray = false
-                } else {
-                    armedButton = .Edit
+            else {
+                // These are the REGEN, EDIT, DELETE buttons shown when not editing
+                if message.sender == .ai {
+                    // only ai messages get the regenerate option...
+                    Button(action: {
+                        if armedButton == .Regenerate {
+                            regenerateButtonAction()
+                            armedButton = .None
+                            showTray = false
+                        } else {
+                            armedButton = .Regenerate
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
+                            .help("Regenerate")
+                    }
+                    .buttonStyle(.plain)
                 }
-            }) {
-                Image(systemName: "pencil")
-                    .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Edit, showTray: showTray)
-                    .help("Edit")
-            }
-            .buttonStyle(.plain)
-
-            Button(action: {
-                if armedButton == .Delete {
-                    deleteButtonAction()
-                    armedButton = .None
-                    showTray = false
-                } else {
-                    armedButton = .Delete
+                Button(action: {
+                    if armedButton == .Edit {
+                        editButtonAction()
+                        armedButton = .None
+                    } else {
+                        armedButton = .Edit
+                    }
+                }) {
+                    Image(systemName: "pencil")
+                        .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Edit, showTray: showTray)
+                        .help("Edit")
                 }
-            }) {
-                Image(systemName: "trash")
-                    .sidecarTrayButtonStyle(background: .red, armed: armedButton == .Delete, showTray: showTray)
-                    .help("Delete")
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    if armedButton == .Delete {
+                        deleteButtonAction()
+                        armedButton = .None
+                        showTray = false
+                    } else {
+                        armedButton = .Delete
+                    }
+                }) {
+                    Image(systemName: "trash")
+                        .sidecarTrayButtonStyle(background: .red, armed: armedButton == .Delete, showTray: showTray)
+                        .help("Delete")
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .opacity(showTray ? 1.0 : 0.0)
         .animation(.easeInOut(duration: 0.2), value: showTray)
@@ -151,9 +196,8 @@ struct MessageView: View {
     
     private var MessageBubbleContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            let isThinking = message.parsedContent.thinkingContent != nil && message.parsedContent.responseContent.isEmpty
-            
             // show thinking section if it exists and is from AI
+            let isThinking = message.parsedContent.thinkingContent != nil && message.parsedContent.responseContent.isEmpty
             if message.sender == .ai, let thinking = message.parsedContent.thinkingContent {
                 ThinkingView(
                     content: thinking,
@@ -161,9 +205,29 @@ struct MessageView: View {
                     isExpanded: $isThinkingExpanded)
             }
             
-            Text(message.parsedContent.responseContent)
-                .textSelection(.enabled)
-                .padding(12)
+            // if we're editing, we put everything in the TextField, otherwise it's just a plain Text widget
+            if isEditing {
+                TextEditor(text: $draftContent)
+                    .focused($isEditorFocused)
+                    .font(.body)
+                    .frame(minHeight: 40, maxHeight: 400)
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .background(.clear)
+                    .onKeyPress(.return) {
+                        if NSEvent.modifierFlags.contains(.command) {
+                            commitEditButtonAction()
+                            isEditing = false
+                            showTray = false
+                            armedButton = .None
+                        }
+                        return .ignored
+                    }
+            } else {
+                Text(message.parsedContent.responseContent)
+                    .textSelection(.enabled)
+                    .padding(12)
+            }
         }
         .background(message.sender == .user ? Color.blue : Color.gray.opacity(0.2))
         .foregroundColor(message.sender == .user ? .white : .primary)
@@ -259,8 +323,18 @@ struct MessageView: View {
     }
     
     private func editButtonAction() {
-        // TODO: Implement edit logic
-        print("DEBUG: Edit tapped for \(message.id)")
+        draftContent = message.content
+        isEditing = true;
+        showTray = true;
+        Task {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            isEditorFocused = true
+        }
+    }
+    
+    private func commitEditButtonAction() {
+        message.content = draftContent
+        appState.saveChatLog()
     }
     
     private func deleteButtonAction() {
