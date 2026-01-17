@@ -75,8 +75,8 @@ Swift apps for MacOS or iOS can have something more substantial to reference.
 ## Implementation Notes
 
 * the `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
-* the configuration and chatlog are saved in the app's application support directory on MacOS,
-  is something like: `/Users/<USER>/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
+* the configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
+  `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
 * the last known commit that fully worked with offloading to Metal is commit **0fa154e** 
   from Sept 14, 2025 which comes right before the commit (9dcd200) which changed the way 
   memory usage works. now the memory doesn't seem to get released
