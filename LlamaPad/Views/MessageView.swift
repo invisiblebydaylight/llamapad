@@ -230,7 +230,9 @@ struct MessageView: View {
                     .padding(12)
             }
         }
-        .background(message.sender == .user ? Color.blue : Color.gray.opacity(0.2))
+        .background(message.sender == .user ?
+                    (isEditing ? Color.blue.opacity(0.2) : Color.blue) :
+                        Color.gray.opacity(0.2))
         .foregroundColor(message.sender == .user ? .white : .primary)
         .cornerRadius(16)
         .overlay(RoundedRectangle(cornerRadius: 16)
