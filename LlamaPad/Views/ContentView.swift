@@ -26,12 +26,16 @@ struct ContentView: View {
                 InputBarView(
                     appState: appState,
                     inputText: $inputText,
-                    onSend: { message in
+                    onSendUserMessage: { message in
                         let newMessage = Message(sender: .user, content: message)
                         appState.messageLog.append(newMessage)
-                        
                         Task {
                             await appState.generateChatResponse()
+                        }
+                    },
+                    onGenerateAiResponse: { isContinue in
+                        Task {
+                            await appState.generateChatResponse(isContinue: isContinue)
                         }
                     }
                 )

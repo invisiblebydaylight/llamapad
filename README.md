@@ -15,6 +15,13 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 ![The basic configuration options](./screenshots/options.png)
 
 
+##Features
+* Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native on-device text generation.
+  **Nothing is sent to the cloud.**
+* AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
+* Edit, regenerate, delete, continuation and generation of new responses are all supported.
+
+
 ## How To Install
 
 Start by cloning the repository and then making sure that the submodule for [llama.cpp](https://github.com/ggml-org/llama.cpp/)

@@ -326,7 +326,7 @@ actor LlamaContext: Sendable {
 
     // converts an array of Message objects to a formatted prompt using the model's chat template,
     // but not any embedded jinja code.
-    func formatPrompt(messages: [(sender: MessageSender, content: String)], systemMessage: String?, template: String?) throws -> String {
+    func formatPrompt(messages: [(sender: MessageSender, content: String)], systemMessage: String?, template: String?, isContinue: Bool) throws -> String {
         // convert Message objects into a C llama_chat_message array and setup the
         // defer deallocation function immediately so that this will run even if
         // the function bails out early from throwing an exception
@@ -377,7 +377,7 @@ actor LlamaContext: Sendable {
                 template,
                 chatBuffer.baseAddress,
                 chatBuffer.count,
-                true,
+                !isContinue,
                 nil,
                 0
             )
@@ -397,7 +397,7 @@ actor LlamaContext: Sendable {
                 template,
                 chatBuffer.baseAddress,
                 chatBuffer.count,
-                true, // Add assistant header to generate a response
+                !isContinue, // add assistant header to generate a response only if not continuing
                 &buffer,
                 requiredSize
             )
@@ -406,7 +406,19 @@ actor LlamaContext: Sendable {
             throw LlamaError.couldNotApplyChatTemplate
         }
         
-        return String(cString: buffer)
+        var prompt = String(cString: buffer)
+        
+        // the basic chat templating built into llama.cpp can add end-of-generation token markers for some
+        // formats, which doesn't work well for us if we're trying to continue the message.
+        // the simplest solution is to just purge everything that gets added to the prompt after the
+        // last messages's content if we're doing a 'continue' generation
+        if isContinue, let lastMessage = messages.last {
+            if let range = prompt.range(of: lastMessage.content, options: .backwards) {
+                prompt = String(prompt[..<range.upperBound])
+            }
+        }
+        
+        return prompt
     }
 
     func tokenize(text: String, addBOS: Bool, parseSpecials: Bool = true) -> [Int32] {

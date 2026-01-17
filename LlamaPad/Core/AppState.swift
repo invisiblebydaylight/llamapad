@@ -100,7 +100,7 @@ class AppState: ObservableObject {
 
     /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
     private func calculatePromptTokenCount() async {
-        let prompt = await buildPrompt()
+        let prompt = await buildPrompt(isContinue:false)
         if let prompt {
             self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
         }
@@ -202,7 +202,7 @@ class AppState: ObservableObject {
 
     /// builds the prompt for text generation based off the loaded model, the configuration and the messages.
     /// if it's unable to build a prompt, `nil` is returned
-    private func buildPrompt() async -> String? {
+    private func buildPrompt(isContinue: Bool) async -> String? {
         guard let config = modelConfig else {
             return nil
         }
@@ -218,14 +218,15 @@ class AppState: ObservableObject {
             return try await llamaContext.formatPrompt(
                 messages: processedMessages,
                 systemMessage: config.systemMessage,
-                template: config.chatTemplate)
+                template: config.chatTemplate,
+                isContinue: isContinue)
         } catch {
             return nil
         }
     }
 
     // generates an AI response based on the current message log using the embedded model formatting
-    func generateChatResponse() async {
+    func generateChatResponse(isContinue: Bool = false) async {
         guard let llamaContext else {
             reportError("Error: Model not loaded and it really should be at this point... Interesting.")
             return
@@ -241,15 +242,25 @@ class AppState: ObservableObject {
         }
         
         // build out the prompt
-        let prompt = await buildPrompt()
+        let prompt = await buildPrompt(isContinue: isContinue)
         guard let prompt else {
             reportError("Failed to build the prompt from the message log. Aborting generation.")
             return
         }
+        print("Info: PROMPT------>\n\(prompt)\n<----END PROMPT")
         
-        // add placeholder AI message that we'll update as tokens arrive
-        let aiMessage = Message(sender: .ai, content: "")
-        self.messageLog.append(aiMessage)
+        var fullResponse: String
+        let aiMessage: Message
+        if isContinue, let last = messageLog.last {
+            // if we're continuing we don't append a new message
+            aiMessage = last
+            fullResponse = last.content
+        } else {
+            // add placeholder AI message that we'll update as tokens arrive
+            aiMessage = Message(sender: .ai, content: "")
+            fullResponse = ""
+            self.messageLog.append(aiMessage)
+        }
         
         // initialize completion
         let t_start = DispatchTime.now().uptimeNanoseconds
@@ -266,7 +277,6 @@ class AppState: ObservableObject {
         
         // generate tokens and update UI incrementally
         var generatedTokens = 0
-        var fullResponse = ""
         var timeToFirstToken: UInt64 = 0
         while await !llamaContext.isDone && !self.shouldStopGenerating {
             do {
@@ -306,7 +316,7 @@ class AppState: ObservableObject {
         saveChatLog()
     }
     
-    // rough token estimation (1 token ≈ 4 chars for English text)
+    /// a rough token estimation (1 token ≈ 4 chars for English text) is used if a loaded model cannot tokenize directly
     func getTokenCount(for text: String) async -> Int {
         guard let llamaContext = llamaContext else {
             return max(1, text.count / 4)
