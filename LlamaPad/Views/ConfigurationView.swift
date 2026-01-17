@@ -35,30 +35,51 @@ struct ConfigurationView: View {
         }
         return URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent
     }
+    
+    /// determines if the current `draftConfig` requires a context reload
+    private var needsReload: Bool {
+        if let current = appState.modelConfig  {
+            return (draftConfig.modelPath != current.modelPath) ||
+            (draftConfig.contextLength != current.contextLength) ||
+            (draftConfig.layerCountToOffload != current.layerCountToOffload)
+        }
+        
+        return true
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Model") {
-                    HStack {
-                        Text("Model File")
-                        
-                        Spacer()
-                        
-                        if draftConfig.modelPath.isEmpty {
-                            Text("GGUF File Required...")
-                                .foregroundColor(Color(.systemRed))
-                                .italic()
-                        } else {
-                            Text(URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent)
-                                .foregroundColor(.primary)
-                        }
+                    VStack {
+                        HStack {
+                            Text("Model File")
                             
-                        Button("Browse...") {
-                            showingFilePicker = true
+                            Spacer()
+                            
+                            if draftConfig.modelPath.isEmpty {
+                                Text("GGUF File Required...")
+                                    .foregroundColor(Color(.systemRed))
+                                    .italic()
+                            } else {
+                                Text(URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Button("Browse...") {
+                                showingFilePicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            .fixedSize()
                         }
-                        .buttonStyle(.bordered)
-                        .fixedSize()
+                        
+                        if needsReload {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text("Model settings changed and will reload upon save...").font(.caption)
+                            }
+                            .foregroundColor(.orange)
+                        }
                     }
                     
                     HStack {
@@ -261,10 +282,23 @@ struct ConfigurationView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save Changes") {
                         Task {
+                            // see if we need to trigger a full reload - only certain operations change
+                            // the loaded model's context in llama.cpp...
+                            let needsReload: Bool
+                            if let config = appState.modelConfig {
+                                needsReload = (draftConfig.modelPath != config.modelPath) ||
+                                              (draftConfig.contextLength != config.contextLength) ||
+                                              (draftConfig.layerCountToOffload != config.layerCountToOffload)
+                            } else {
+                                needsReload = true
+                            }
+                            
                             appState.modelConfig = ModelConfiguration(draftConfig)
                             do {
                                 try PersistenceService.saveConfiguration(draftConfig)
-                                await appState.reloadModel()
+                                if needsReload {
+                                    await appState.reloadModel()
+                                }
                             } catch {
                                 errorMessage = error.localizedDescription
                                 showingError = true
