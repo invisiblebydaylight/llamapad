@@ -99,7 +99,15 @@ class AppState: ObservableObject {
     }
 
     /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
-    private func calculatePromptTokenCount() async {
+    func calculatePromptTokenCount() async {
+        if let config = modelConfig {
+            if config.maxGenerationLength != 0 {
+                await llamaContext?.setNumberToPredict(config.maxGenerationLength)
+            } else {
+                await llamaContext?.setNumberToPredict(config.reservedContextBuffer)
+            }
+        }
+
         let prompt = await buildPrompt(isContinue:false)
         if let prompt {
             self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
@@ -240,7 +248,9 @@ class AppState: ObservableObject {
             self.isGenerating = false
             self.shouldStopGenerating = false
         }
-        
+
+        await llamaContext.setNumberToPredict(modelConfig!.maxGenerationLength)
+
         // build out the prompt
         let prompt = await buildPrompt(isContinue: isContinue)
         guard let prompt else {
@@ -265,7 +275,6 @@ class AppState: ObservableObject {
         // initialize completion
         let t_start = DispatchTime.now().uptimeNanoseconds
         do {
-            await llamaContext.setNumberToPredict(modelConfig!.maxGenerationLength)
             try await llamaContext.completionInit(text: prompt)
         } catch {
             // remove prediction placeholder on failure
@@ -329,9 +338,22 @@ class AppState: ObservableObject {
     private func prepareMessagesForPrompt() async -> [(sender: MessageSender, content: String)] {
         guard let llamaContext = llamaContext else { return [] }
         
+        // this is the number of tokens to add representing the number of tokens
+        // a potential chat format might add, per message. by default this is
+        // a somewhat pessimistic value.
+        let perMessageOverhead = 10
+        
         // reserve space for generation budget and template overhead
         let contextLength = Int(llamaContext.contextLength)
-        let generationBudget = await Int(llamaContext.numToPredict)
+        
+        // if `maxGenerationLength` is 0, we treat this as unbound, so we then check
+        // the `reservedContextBuffer` setting to see how much of the context to
+        // reserve for the space to the AI reply in.
+        var generationBudget = await Int(llamaContext.numToPredict)
+        if generationBudget == 0, let config = modelConfig {
+            generationBudget = config.reservedContextBuffer
+        }
+        
         let availableTokens = contextLength - generationBudget
         
         var totalTokensUsed = 0
@@ -345,7 +367,7 @@ class AppState: ObservableObject {
             // skip empty messages (e.g., thinking-only partial messages)
             guard !contentForPrompt.isEmpty else { continue }
             
-            let estimatedTokens = await getTokenCount(for: contentForPrompt)
+            let estimatedTokens = await getTokenCount(for: contentForPrompt) + perMessageOverhead
             
             // stop if adding this message would exceed context
             if totalTokensUsed + estimatedTokens > availableTokens {

@@ -8,11 +8,12 @@ class ModelConfiguration: ObservableObject, Codable {
     @Published var chatTemplate: String? = nil
     @Published var contextLength: Int = 4096
     @Published var maxGenerationLength: Int = 0
+    @Published var reservedContextBuffer: Int = 1024
     @Published var layerCountToOffload: Int = 99
     @Published var customSampler: SamplerSettings = SamplerSettings()
 
     enum CodingKeys: String, CodingKey {
-        case modelPath, modelBookmark, systemMessage, chatTemplate, contextLength, maxGenerationLength, layerCountToOffload, customSampler
+        case modelPath, modelBookmark, systemMessage, chatTemplate, contextLength, maxGenerationLength, reservedContextBuffer, layerCountToOffload, customSampler
     }
 
     init() {}
@@ -26,6 +27,7 @@ class ModelConfiguration: ObservableObject, Codable {
         chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
         contextLength = try container.decode(Int.self, forKey: .contextLength)
         maxGenerationLength = try container.decode(Int.self, forKey: .maxGenerationLength)
+        reservedContextBuffer = try container.decodeIfPresent(Int.self, forKey: .reservedContextBuffer) ?? 1024
         layerCountToOffload = try container.decode(Int.self, forKey: .layerCountToOffload)
         customSampler = try container.decode(SamplerSettings.self, forKey: .customSampler)
     }
@@ -38,6 +40,7 @@ class ModelConfiguration: ObservableObject, Codable {
         self.chatTemplate = other.chatTemplate
         self.contextLength = other.contextLength
         self.maxGenerationLength = other.maxGenerationLength
+        self.reservedContextBuffer = other.reservedContextBuffer
         self.layerCountToOffload = other.layerCountToOffload
         self.customSampler = other.customSampler
     }
@@ -50,6 +53,7 @@ class ModelConfiguration: ObservableObject, Codable {
         try container.encode(chatTemplate, forKey: .chatTemplate)
         try container.encode(contextLength, forKey: .contextLength)
         try container.encode(maxGenerationLength, forKey: .maxGenerationLength)
+        try container.encode(reservedContextBuffer, forKey: .reservedContextBuffer)
         try container.encode(layerCountToOffload, forKey: .layerCountToOffload)
         try container.encode(customSampler, forKey: .customSampler)
     }

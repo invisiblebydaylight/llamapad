@@ -220,6 +220,13 @@ struct ConfigurationView: View {
                         Stepper("", value: $draftConfig.customSampler.magic_seed)
                             .labelsHidden()
                     }
+                    HStack {
+                        Text("Reserved Context Buffer")
+                        TextField("", value: $draftConfig.reservedContextBuffer, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.reservedContextBuffer, in: 128...4096, step: 128)
+                            .labelsHidden()
+                    }
                     // Reset Advanced button
                     Button("Reset Advanced to Defaults") {
                         draftConfig.customSampler = SamplerSettings()
@@ -229,7 +236,7 @@ struct ConfigurationView: View {
                     .font(.caption)
 
                 } label: {
-                    Text("Advanced Sampling")
+                    Text("Advanced Settings")
                         .onTapGesture {
                             withAnimation {
                                 isAdvSamplerExpanded.toggle()
@@ -298,6 +305,8 @@ struct ConfigurationView: View {
                                 try PersistenceService.saveConfiguration(draftConfig)
                                 if needsReload {
                                     await appState.reloadModel()
+                                } else {
+                                    await appState.calculatePromptTokenCount()
                                 }
                             } catch {
                                 errorMessage = error.localizedDescription
