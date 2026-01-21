@@ -99,7 +99,7 @@ actor LlamaContext: Sendable {
     private var vocab: OpaquePointer?
     private var sampling: UnsafeMutablePointer<llama_sampler>?
     private var batch: llama_batch?
-    private var tokens: [llama_token]
+    private var residentTokens: [llama_token]
     private var samplerSettings: SamplerSettings
 
     // this variable is used to store temporarily invalid cchars
@@ -118,7 +118,7 @@ actor LlamaContext: Sendable {
         self.model = model
         self.context = context
         self.samplerSettings = samplerSettings
-        self.tokens = []
+        self.residentTokens = []
         self.temporary_invalid_cchars = []
         self.vocab = llama_model_get_vocab(model)
         let sparams = llama_sampler_chain_default_params()
@@ -149,7 +149,8 @@ actor LlamaContext: Sendable {
             samplerSettings.xtcMinKeep,
             0))
         llama_sampler_chain_add(self.sampling, llama_sampler_init_temp(samplerSettings.temperature))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_dist(samplerSettings.magic_seed))
+        llama_sampler_chain_add(self.sampling, llama_sampler_init_dist(
+            samplerSettings.magic_seed == 0 ? LLAMA_DEFAULT_SEED : samplerSettings.magic_seed))
     }
     
     deinit{
@@ -224,39 +225,91 @@ actor LlamaContext: Sendable {
     
     /// returns the number of tokens loaded into the context at present.
     func getTokenCount() -> Int {
-        self.tokens.count
+        self.residentTokens.count
     }
     
     // start the text completion process by tokenizing the prompt and then
-    // setting up the batch.
-    func completionInit(text: String) throws {
+    // setting up the batch. it returns the actual number of new tokens
+    // ingested in the prompt, which can be different than the total
+    // number of tokens in the `text` String because it will reuse
+    // already digested tokens if possible.
+    func completionInit(text: String) throws -> Int {
         isDone = false
         batch = nil
         currentTokenCount = 0
         temporary_invalid_cchars.removeAll()
         
-        let addBOS = llama_vocab_get_add_bos(vocab)
-        tokens = tokenize(text: text, addBOS: addBOS)
-        
-        // verify capacity
-        let currentContextSize = llama_n_ctx(context)
-        let required = tokens.count + Int(numToPredict)
-        guard required <= currentContextSize else {
-            throw LlamaError.notEnoughContext(required, Int(currentContextSize))
+        guard let context, let vocab else {
+            throw LlamaError.couldNotInitializeContext
         }
 
-        let n_batch = Int(llama_n_batch(context))
+        let addBOS = llama_vocab_get_add_bos(vocab)
+        let newTokens = tokenize(text: text, addBOS: addBOS)
+
+        // we're going to continue where we left off if possible,
+        // this is going to check and see how many tokens match up
+        var commonPrefixCount = 0
+        for i in 0..<min(newTokens.count, residentTokens.count) {
+            if newTokens[i] == residentTokens[i] {
+                commonPrefixCount += 1
+            } else {
+                break
+            }
+        }
         
-        // batch the tokens in chunks
-        for i in stride(from: 0, to: tokens.count, by: n_batch) {
-            let n_eval = min(tokens.count - i, n_batch)
-            try tokens[i..<i+n_eval].withUnsafeMutableBufferPointer { buffer in
-                let batched = llama_batch_get_one(buffer.baseAddress!, Int32(n_eval))
+        // if the prompt is a perfect match, we still re-decode the
+        // last token to refresh the logits for the sampler
+        if commonPrefixCount == newTokens.count && commonPrefixCount > 0 {
+            commonPrefixCount -= 1
+        }
+        
+        // now that we know how many tokens match, we can remove everything
+        // that comes after the matching section. this means that we don't
+        // have to process the same part of the prompt over again.
+        if commonPrefixCount < residentTokens.count {
+            let mem = llama_get_memory(context)
+            // seq_id 0, from position commonPrefixCount to infinity (-1)
+            _ = llama_memory_seq_rm(mem, 0, Int32(commonPrefixCount), -1)
+            residentTokens.removeSubrange(commonPrefixCount...)
+        }
+            
+        // now we only decode the new tokens from the prompt
+        var tokensDecoded = 0
+        let tokensToDecode = Array(newTokens.suffix(from: commonPrefixCount))
+        if !tokensToDecode.isEmpty {
+            let n_batch_max = Int(llama_n_batch(context))
+            for i in stride(from: 0, to: tokensToDecode.count, by: n_batch_max) {
+                let n_eval = Int32(min(tokensToDecode.count - i, n_batch_max))
+                
+                var batched = llama_batch_init(n_eval, 0, 1)
+                defer { llama_batch_free(batched) }
+
+                batched.n_tokens = n_eval
+                for j in 0..<Int(n_eval) {
+                    let currentTokenIdx = i + j
+                    let absolutePosition = Int32(commonPrefixCount + currentTokenIdx)
+                    
+                    batched.token[j] = tokensToDecode[currentTokenIdx]
+                    batched.pos[j] = absolutePosition
+                    batched.n_seq_id[j] = 1
+                    batched.seq_id[j]![0] = 0
+                    
+                    // we only need the logits for the very last token of the whole prompt
+                    let isLastToken = (commonPrefixCount + currentTokenIdx == newTokens.count - 1)
+                    batched.logits[j] = isLastToken ? 1 : 0
+                }
+
                 if llama_decode(context, batched) != 0 {
                     throw LlamaError.decodeFailed
                 }
+                tokensDecoded += Int(n_eval)
             }
         }
+        
+        // update our record of what is in the cache and return the number
+        // of tokens actually decoded in this call.
+        self.residentTokens = newTokens
+        return tokensDecoded
     }
 
     // predicts the next token and returns the String equivalent if possible
@@ -303,7 +356,7 @@ actor LlamaContext: Sendable {
         }
         
         // update the state with the progress
-        tokens.append(newTokenId)
+        residentTokens.append(newTokenId)
         lastToken = [newTokenId]
         
         // create batch pointing to persistent storage
@@ -314,14 +367,6 @@ actor LlamaContext: Sendable {
         currentTokenCount += 1
 
         return validString
-    }
-
-    func clear() {
-        tokens.removeAll()
-        temporary_invalid_cchars.removeAll()
-        llama_memory_clear(llama_get_memory(context), true)
-        currentTokenCount = 0
-        lastToken = []
     }
 
     // converts an array of Message objects to a formatted prompt using the model's chat template,

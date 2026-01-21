@@ -273,9 +273,10 @@ class AppState: ObservableObject {
         }
         
         // initialize completion
+        var actualTokensProcessed: Int = 0
         let t_start = DispatchTime.now().uptimeNanoseconds
         do {
-            try await llamaContext.completionInit(text: prompt)
+            actualTokensProcessed = try await llamaContext.completionInit(text: prompt)
         } catch {
             // remove prediction placeholder on failure
             reportError("Completion initialization failed: \(error.localizedDescription)")
@@ -306,19 +307,16 @@ class AppState: ObservableObject {
             }
         }
         
-        // clean up
-        await llamaContext.clear()
-        
         // print statistics
         let t_heat = Double(timeToFirstToken - t_start) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
         let t_generation = Double(t_end - timeToFirstToken) / NS_PER_S
-        let prompt_tps = Double(self.lastPromptTokenCount) / t_heat
+        let prompt_tps = Double(actualTokensProcessed) / t_heat
         let generation_tps = Double(generatedTokens-1) / t_generation
         
         print("Info: Generation complete:")
         print("  Time to first token: \(t_heat)s")
-        print("  Prompt speeds: \(self.lastPromptTokenCount) tokens ; \(prompt_tps) t/s")
+        print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
         print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
         
         // make sure to serialize as the final step so nothing's lost
