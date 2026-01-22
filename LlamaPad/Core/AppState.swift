@@ -13,6 +13,10 @@ class AppState: ObservableObject {
     /// main storage for all of the messages in the log
     @Published var messageLog: [Message] = []
     
+    /// tracks the first message to be included in the prompt allowing some maintenance
+    /// of KV cache stability so that constant prompt ingestion doesn't have to happen.
+    @Published var contextAnchorID: UUID?
+    
     /// keeps track of the loaded LLM and its context
     @Published var llamaContext: LlamaContext?
     
@@ -24,7 +28,7 @@ class AppState: ObservableObject {
     
     /// set this to true to request the generation loop to stop
     @Published var shouldStopGenerating = false
-
+    
     /// the last error message reported by the user
     @Published var lastErrorMessage: String?
     
@@ -32,7 +36,7 @@ class AppState: ObservableObject {
     @Published var showingErrorAlert = false
     
     @Published var lastPromptTokenCount: Int = 0
-
+    
     init() {
         // start off by loading the configuration file first, if it exists
         do {
@@ -58,18 +62,20 @@ class AppState: ObservableObject {
             reportError("Chatlog error: \(error.localizedDescription)")
         }
     }
-
+    
     // a helper to trigger the UI alerts
     func reportError(_ message: String) {
         self.lastErrorMessage = message
         self.showingErrorAlert = true
     }
-
+    
     /// unloads any loaded model and then reloads the model specified in the configuration
     func reloadModel() async {
         await unloadModel()
         await loadModelFromConfiguration()
-        await calculatePromptTokenCount()
+        Task {
+            await calculatePromptTokenCount()
+        }
     }
     
     /// removes all the messages in the `messageLog` and resets the prompt token counter on a background Task
@@ -97,7 +103,7 @@ class AppState: ObservableObject {
             }
         }
     }
-
+    
     /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
     func calculatePromptTokenCount() async {
         if let config = modelConfig {
@@ -107,13 +113,13 @@ class AppState: ObservableObject {
                 await llamaContext?.setNumberToPredict(config.reservedContextBuffer)
             }
         }
-
+        
         let prompt = await buildPrompt(isContinue:false)
         if let prompt {
             self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
         }
     }
-
+    
     private func loadModelFromConfiguration() async {
         guard let config = modelConfig else {
             reportError("Error: No configuration available; hit that gear icon and setup the app.")
@@ -176,9 +182,9 @@ class AppState: ObservableObject {
         } catch {
             reportError("Error: failed to load model file \(modelURL.path()): \(error.localizedDescription)")
         }
-
-    }
         
+    }
+    
     func unloadModel() async {
         await self.llamaContext?.unload()
         self.llamaContext = nil
@@ -199,15 +205,15 @@ class AppState: ObservableObject {
     }
     
     private func validateModelPath(_ path: String) -> Bool {
-        #if os(iOS)
+#if os(iOS)
         // On iOS, ensure file exists in our sandbox
         return FileManager.default.fileExists(atPath: path)
-        #else
+#else
         // On macOS, check access more thoroughly
         return FileManager.default.isReadableFile(atPath: path)
-        #endif
+#endif
     }
-
+    
     /// builds the prompt for text generation based off the loaded model, the configuration and the messages.
     /// if it's unable to build a prompt, `nil` is returned
     private func buildPrompt(isContinue: Bool) async -> String? {
@@ -232,7 +238,7 @@ class AppState: ObservableObject {
             return nil
         }
     }
-
+    
     // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse(isContinue: Bool = false) async {
         guard let llamaContext else {
@@ -248,9 +254,9 @@ class AppState: ObservableObject {
             self.isGenerating = false
             self.shouldStopGenerating = false
         }
-
+        
         await llamaContext.setNumberToPredict(modelConfig!.maxGenerationLength)
-
+        
         // build out the prompt
         let prompt = await buildPrompt(isContinue: isContinue)
         guard let prompt else {
@@ -335,48 +341,68 @@ class AppState: ObservableObject {
     // prepares messages for prompt by removing thinking blocks and filtering by context size
     private func prepareMessagesForPrompt() async -> [(sender: MessageSender, content: String)] {
         guard let llamaContext = llamaContext else { return [] }
+        let contextLength = Int(llamaContext.contextLength)
         
         // this is the number of tokens to add representing the number of tokens
         // a potential chat format might add, per message. by default this is
         // a somewhat pessimistic value.
         let perMessageOverhead = 10
         
-        // reserve space for generation budget and template overhead
-        let contextLength = Int(llamaContext.contextLength)
-        
+        // make sure we have space for our text generation
         // if `maxGenerationLength` is 0, we treat this as unbound, so we then check
         // the `reservedContextBuffer` setting to see how much of the context to
         // reserve for the space to the AI reply in.
-        var generationBudget = await Int(llamaContext.numToPredict)
+        let numToPredict = await Int(llamaContext.numToPredict)
+        var generationBudget = numToPredict
         if generationBudget == 0, let config = modelConfig {
             generationBudget = config.reservedContextBuffer
         }
         
-        let availableTokens = contextLength - generationBudget
+        let safetyThreshold = contextLength - generationBudget
         
-        var totalTokensUsed = 0
-        var processedMessages: [(sender: MessageSender, content: String)] = []
-        
-        // process from newest to oldest to prioritize recent context
-        for message in messageLog.reversed() {
-            let parsed = ParsedMessage.parse(message.content)
-            let contentForPrompt = parsed.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // skip empty messages (e.g., thinking-only partial messages)
-            guard !contentForPrompt.isEmpty else { continue }
-            
-            let estimatedTokens = await getTokenCount(for: contentForPrompt) + perMessageOverhead
-            
-            // stop if adding this message would exceed context
-            if totalTokensUsed + estimatedTokens > availableTokens {
-                break
+        // if we have a contextAnchorID for a message, then we only consider messages from
+        // that message forward in time.
+        var startIndex = 0
+        if let anchorID = contextAnchorID {
+            if let index = messageLog.firstIndex(where: { $0.id == anchorID }) {
+                startIndex = index
+            } else {
+                contextAnchorID = nil
             }
-            
-            totalTokensUsed += estimatedTokens
-            processedMessages.append((sender: message.sender, content: contentForPrompt))
         }
         
-        // return in chronological order
-        return processedMessages.reversed()
+        // see if we can fit the current messages into our `safetyThreshold` from our anchor, onward
+        var totalTokens = 0
+        for i in startIndex..<messageLog.count {
+            let content = messageLog[i].parsedContent.responseContent
+            totalTokens += await getTokenCount(for: content) + perMessageOverhead
+        }
+        
+        if totalTokens > safetyThreshold {
+            // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
+            // so that the KV cache isn't constantly regenerating
+            let runwayTarget = (modelConfig?.reservedContextBuffer ?? numToPredict)
+            let limitWithRunway = safetyThreshold - runwayTarget
+            
+            // slide the start index forward until we're under the limitWithRunway length
+            while totalTokens > limitWithRunway && startIndex < messageLog.count - 1 {
+                let content = messageLog[startIndex].parsedContent.responseContent
+                let msgTokens = await getTokenCount(for: content) + perMessageOverhead
+                totalTokens -= msgTokens
+                startIndex += 1
+            }
+            
+            // adjust the anchor to point to this new Message
+            contextAnchorID = messageLog[startIndex].id
+        } else if contextAnchorID == nil && !messageLog.isEmpty {
+            contextAnchorID = messageLog.first!.id
+        }
+
+        // convert our stable 'window' into the messageLog into the returned format
+        return messageLog[startIndex...].compactMap { message in
+            let content = message.parsedContent.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !content.isEmpty else { return nil }
+            return (sender: message.sender, content: content)
+        }
     }
 }

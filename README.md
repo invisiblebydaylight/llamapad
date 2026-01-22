@@ -20,6 +20,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
   **Nothing is sent to the cloud.**
 * AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
+* Simple, but effective use of the KV cache to keep prompt processing to a minimum.
 
 
 ## How To Install
@@ -74,16 +75,22 @@ Swift apps for MacOS or iOS can have something more substantial to reference.
 
 ## Implementation Notes
 
-* the `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
-* the configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
+* To maintain high performance during long conversation, LlamaPad uses a simple strategy for KV
+  cache management. Instead of sliding the context window on just about every message on a long
+  chatlog, it will 'anchor' the prompt to a chatlog message to add a minimum space of 
+  at least `reservedContextBuffer`, which is a variable set in the configuration file (and in the UI).
+  This means that enough tokens have to be added and generated to eclips the `reservedContextBuffer`
+  before the prompt's window into the chatlog slides again and causes a major prompt ingestion delay.
+* The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
+* The configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
-* the last known commit that fully worked with offloading to Metal is commit **0fa154e** 
+* The last known commit that fully worked with offloading to Metal is commit **0fa154e** 
   from Sept 14, 2025 which comes right before the commit (9dcd200) which changed the way 
-  memory usage works. now the memory doesn't seem to get released
+  memory usage works. Now the memory doesn't seem to get released
   when the context and model are released so subsequent model switches can cause swap thrashing on 
   MacOS or worse yet, hard reboots on iPads. Not offloading layers to Metal resolves this behavior.
-* specifically for iPad deployment on the new M5 chip the last fully supported commit is **b7f9010**, 
-  the commit right before the Metal4 tensor API support (5b180c3). after that, a fix had do be introduced
+* Specifically for iPad deployment on the new M5 chip the last fully supported commit is **b7f9010**, 
+  the commit right before the Metal4 tensor API support (5b180c3). After that, a fix had do be introduced
   to disable BF16 support in Metal since it caused model load crashes on M5 systems:
   `setenv("GGML_METAL_BF16_DISABLE", "1", 1)`
 
