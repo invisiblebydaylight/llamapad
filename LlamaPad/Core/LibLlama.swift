@@ -233,7 +233,7 @@ actor LlamaContext: Sendable {
     // ingested in the prompt, which can be different than the total
     // number of tokens in the `text` String because it will reuse
     // already digested tokens if possible.
-    func completionInit(text: String) throws -> Int {
+    func completionInit(text: String, canContinue: ()->Bool = { true }) throws -> Int {
         isDone = false
         batch = nil
         currentTokenCount = 0
@@ -279,6 +279,10 @@ actor LlamaContext: Sendable {
         if !tokensToDecode.isEmpty {
             let n_batch_max = Int(llama_n_batch(context))
             for i in stride(from: 0, to: tokensToDecode.count, by: n_batch_max) {
+                guard canContinue() else {
+                    break
+                }
+                
                 let n_eval = Int32(min(tokensToDecode.count - i, n_batch_max))
                 
                 var batched = llama_batch_init(n_eval, 0, 1)
@@ -308,7 +312,10 @@ actor LlamaContext: Sendable {
         
         // update our record of what is in the cache and return the number
         // of tokens actually decoded in this call.
-        self.residentTokens = newTokens
+        let actualCount = commonPrefixCount + tokensDecoded
+        self.residentTokens = Array(newTokens.prefix(actualCount))
+        
+        print("DEBUG: actualCount = \(actualCount) & length = \(self.residentTokens.count)")
         return tokensDecoded
     }
 

@@ -39,6 +39,10 @@ struct InputBarView: View {
 
     /// returns the icon to use for the 'send' button.
     private var buttonIcon: String {
+        if appState.shouldStopGenerating {
+            return "hand.raised.fill"
+        }
+
         switch nextAction {
         case .StopGeneration:
             return "stop.fill"
@@ -53,6 +57,10 @@ struct InputBarView: View {
     
     /// returns the help string for the next action the 'send' button does
     private var buttonTooltip: String {
+        if appState.shouldStopGenerating {
+            return "Cancelling..."
+        }
+        
         switch nextAction {
         case .StopGeneration:
             return "Stop Generating"
@@ -128,9 +136,11 @@ struct InputBarView: View {
                     .background(appState.isGenerating ? Color.red : Color.blue)
                     .clipShape(Circle())
                     .foregroundColor(.white)
+                    .opacity(appState.shouldStopGenerating ? 0.6 : 1.0)
             }
             .padding(.leading, 4)
             .help(buttonTooltip)
+            .animation(.easeInOut, value: appState.shouldStopGenerating)
         }
         .padding()
         .buttonStyle(.borderless)

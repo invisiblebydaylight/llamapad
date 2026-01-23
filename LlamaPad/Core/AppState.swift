@@ -282,7 +282,10 @@ class AppState: ObservableObject {
         var actualTokensProcessed: Int = 0
         let t_start = DispatchTime.now().uptimeNanoseconds
         do {
-            actualTokensProcessed = try await llamaContext.completionInit(text: prompt)
+            actualTokensProcessed = try await llamaContext.completionInit(
+                text: prompt,
+                canContinue: { !self.shouldStopGenerating }
+            )
         } catch {
             // remove prediction placeholder on failure
             reportError("Completion initialization failed: \(error.localizedDescription)")
@@ -314,7 +317,7 @@ class AppState: ObservableObject {
         }
         
         // print statistics
-        let t_heat = Double(timeToFirstToken - t_start) / NS_PER_S
+        let t_heat = Double(Int64(timeToFirstToken) - Int64(t_start)) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
         let t_generation = Double(t_end - timeToFirstToken) / NS_PER_S
         let prompt_tps = Double(actualTokensProcessed) / t_heat
