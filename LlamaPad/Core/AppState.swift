@@ -38,6 +38,12 @@ class AppState: ObservableObject {
     /// saves the token count of the last prompt used to generate a response
     @Published var lastPromptTokenCount: Int = 0
     
+    /// used to track the processing status for the app (like prompt ingestion); 0.0..1.0 range.
+    @Published var processingProgress: Double? = nil
+
+    /// describes the current processing task (e.g. "Processing Prompt...")
+    @Published var processingStatus: String? = nil
+    
     /// returns `true` if the app is currently performing a long, heavy action
     /// like loading a model or generating a reply - something that should not be interrupted.
     var isBusy: Bool {
@@ -74,6 +80,12 @@ class AppState: ObservableObject {
     func reportError(_ message: String) {
         self.lastErrorMessage = message
         self.showingErrorAlert = true
+    }
+    
+    // updates the inernal processing progress of a long operation (e.g. prompt processing)
+    func reportProcessStatus(progress: Double?, status: String?) {
+        self.processingProgress = progress
+        self.processingStatus = status
     }
     
     /// unloads any loaded model and then reloads the model specified in the configuration
@@ -260,12 +272,16 @@ class AppState: ObservableObject {
         defer {
             self.isGenerating = false
             self.shouldStopGenerating = false
+            reportProcessStatus(progress: nil, status: nil)
         }
         
         await llamaContext.setNumberToPredict(modelConfig!.maxGenerationLength)
         
         // build out the prompt
-        let prompt = await buildPrompt(isContinue: isContinue)
+        let prompt = await Task.detached {
+            return await self.buildPrompt(isContinue: isContinue)
+        }.value
+        
         guard let prompt else {
             reportError("Failed to build the prompt from the message log. Aborting generation.")
             return
@@ -291,8 +307,17 @@ class AppState: ObservableObject {
         do {
             actualTokensProcessed = try await llamaContext.completionInit(
                 text: prompt,
-                canContinue: { !self.shouldStopGenerating }
+                procUpdate: { pct in
+                    await MainActor.run {
+                        self.reportProcessStatus(progress: pct, status: "Processing prompt...")
+                    }
+                },
+                canContinue: { @MainActor in
+                    return !self.shouldStopGenerating
+                }
             )
+            // ensure the process reporting gets reset
+            reportProcessStatus(progress: nil, status: nil)
         } catch {
             // remove prediction placeholder on failure
             reportError("Completion initialization failed: \(error.localizedDescription)")
@@ -304,6 +329,7 @@ class AppState: ObservableObject {
         // generate tokens and update UI incrementally
         var generatedTokens = 0
         var timeToFirstToken: UInt64 = 0
+        self.reportProcessStatus(progress: nil, status: nil)
         while await !llamaContext.isDone && !self.shouldStopGenerating {
             do {
                 let nextChunk = try await llamaContext.completionStep()

@@ -2,8 +2,14 @@ import SwiftUI
 
 
 struct ChatLogView: View {
-    let appState: AppState
+    @ObservedObject var appState: AppState
     let messages: [Message]
+
+    /// track the current scroll task
+    @State private var scrollTask: Task<Void, Never>? = nil
+    
+    /// track the deepest index we've scrolled to
+    @State private var lastScrollCount: Int = 0
 
     init (appState: AppState) {
         self.appState = appState
@@ -35,9 +41,29 @@ struct ChatLogView: View {
                             ForEach(messages) { message in
                                 MessageView(appState: appState, message: message).id(message.id)
                             }
+                            
+                            if appState.isGenerating, let pct = appState.processingProgress, let status = appState.processingStatus {
+                                // if we're generating and reporting process, currently that's only done for prompt
+                                // processing. Display the cicular progress widget
+                                HStack {
+                                    Spacer()
+                                    if pct <= 0.99 && pct >= 0.01 {
+                                        VStack(spacing: 8) {
+                                            ProgressView(value: pct)
+                                                .progressViewStyle(.circular)
+                                                .padding(.top, 8)
+                                            Text(status)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            
                             // give some space for the scrolling to go past the last message
                             Spacer(minLength: 200)
-                                .id("buttom-spacer")
+                                .id("bottom-spacer")
                         }
                     }
                 }
@@ -52,12 +78,24 @@ struct ChatLogView: View {
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        guard let lastId = lastMessageId else { return }
-        // task ensures we're on the next run loop without a hardcoded delay
-        Task { @MainActor in
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(lastId, anchor: .bottom)
+        let currentCount = appState.messageLog.count
+        
+        // we only scroll if the count has been increased from our last viewing
+        guard currentCount > lastScrollCount else {
+            return
+        }
+        
+        scrollTask?.cancel()
+        scrollTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            if Task.isCancelled { return }
+            
+            withAnimation(.easeIn(duration: 0.25)) {
+                proxy.scrollTo("bottom-spacer", anchor: .bottom)
             }
+        
+            lastScrollCount = currentCount
+            self.scrollTask = nil
         }
     }
 }

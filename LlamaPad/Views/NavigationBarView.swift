@@ -16,8 +16,8 @@ struct NavigationBarView: View {
                     .foregroundColor(.primary)
                     .padding(4)
             }
-            .disabled(appState.isGenerating)
-            .opacity(appState.isGenerating ? 0.5 : 1.0)
+            .disabled(appState.isBusy)
+            .opacity(appState.isBusy ? 0.5 : 1.0)
             .confirmationDialog("Are you sure you want to delete all the messages?",
                                 isPresented: $isShowingDeleteConfirmation) {
                 Button("Clear Chat History", role: .destructive) {

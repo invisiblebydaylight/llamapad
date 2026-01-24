@@ -233,7 +233,10 @@ actor LlamaContext: Sendable {
     // ingested in the prompt, which can be different than the total
     // number of tokens in the `text` String because it will reuse
     // already digested tokens if possible.
-    func completionInit(text: String, canContinue: ()->Bool = { true }) throws -> Int {
+    func completionInit(text: String,
+                        procUpdate: @Sendable @escaping (Double)async->Void = { _ in },
+                        canContinue: @Sendable @escaping ()async->Bool = { true }
+    ) async throws -> Int {
         isDone = false
         batch = nil
         currentTokenCount = 0
@@ -243,6 +246,8 @@ actor LlamaContext: Sendable {
             throw LlamaError.couldNotInitializeContext
         }
 
+        await procUpdate(0.0) 
+        
         let addBOS = llama_vocab_get_add_bos(vocab)
         let newTokens = tokenize(text: text, addBOS: addBOS)
 
@@ -279,7 +284,7 @@ actor LlamaContext: Sendable {
         if !tokensToDecode.isEmpty {
             let n_batch_max = Int(llama_n_batch(context))
             for i in stride(from: 0, to: tokensToDecode.count, by: n_batch_max) {
-                guard canContinue() else {
+                guard await canContinue() else {
                     break
                 }
                 
@@ -307,6 +312,8 @@ actor LlamaContext: Sendable {
                     throw LlamaError.decodeFailed
                 }
                 tokensDecoded += Int(n_eval)
+                await procUpdate(Double(tokensDecoded) / Double(tokensToDecode.count))
+                
             }
         }
         
@@ -314,8 +321,8 @@ actor LlamaContext: Sendable {
         // of tokens actually decoded in this call.
         let actualCount = commonPrefixCount + tokensDecoded
         self.residentTokens = Array(newTokens.prefix(actualCount))
+        await procUpdate(1.0)
         
-        print("DEBUG: actualCount = \(actualCount) & length = \(self.residentTokens.count)")
         return tokensDecoded
     }
 

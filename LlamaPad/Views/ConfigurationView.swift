@@ -317,7 +317,7 @@ struct ConfigurationView: View {
                     }) {
                         if appState.isBusy {
                             HStack {
-                                Text("Waiting...")
+                                Text("Busy...")
                                 Image(systemName: "hourglass")
                             }
                         } else {
