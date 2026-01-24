@@ -35,7 +35,14 @@ class AppState: ObservableObject {
     /// whether or not to show the error alert with the lastErrorMessage text
     @Published var showingErrorAlert = false
     
+    /// saves the token count of the last prompt used to generate a response
     @Published var lastPromptTokenCount: Int = 0
+    
+    /// returns `true` if the app is currently performing a long, heavy action
+    /// like loading a model or generating a reply - something that should not be interrupted.
+    var isBusy: Bool {
+        return isGenerating || isLoadingModel
+    }
     
     init() {
         // start off by loading the configuration file first, if it exists

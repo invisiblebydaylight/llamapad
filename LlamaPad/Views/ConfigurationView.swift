@@ -287,15 +287,15 @@ struct ConfigurationView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save Changes") {
+                    Button(action: {
                         Task {
                             // see if we need to trigger a full reload - only certain operations change
                             // the loaded model's context in llama.cpp...
                             let needsReload: Bool
                             if let config = appState.modelConfig {
                                 needsReload = (draftConfig.modelPath != config.modelPath) ||
-                                              (draftConfig.contextLength != config.contextLength) ||
-                                              (draftConfig.layerCountToOffload != config.layerCountToOffload)
+                                                (draftConfig.contextLength != config.contextLength) ||
+                                                (draftConfig.layerCountToOffload != config.layerCountToOffload)
                             } else {
                                 needsReload = true
                             }
@@ -314,9 +314,19 @@ struct ConfigurationView: View {
                             }
                         }
                         dismiss()
+                    }) {
+                        if appState.isBusy {
+                            HStack {
+                                Text("Waiting...")
+                                Image(systemName: "hourglass")
+                            }
+                        } else {
+                            Text("Save Changes")
+                        }
                     }
-                    .disabled(draftConfig.modelPath.isEmpty)
+                    .disabled(draftConfig.modelPath.isEmpty || appState.isBusy)
                     .buttonStyle(.borderedProminent)
+                    .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }
             }
         }
