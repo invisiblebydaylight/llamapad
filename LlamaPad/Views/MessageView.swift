@@ -336,8 +336,10 @@ struct MessageView: View {
     }
     
     private func commitEditButtonAction() {
-        message.content = draftContent
-        appState.saveChatLog()
+        Task {
+            message.content = draftContent
+            appState.saveChatLog()
+        }
     }
     
     private func deleteButtonAction() {
