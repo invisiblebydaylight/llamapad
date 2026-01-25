@@ -247,7 +247,7 @@ struct ConfigurationView: View {
                 DisclosureGroup(isExpanded: $isSysMsgExpanded) {
                     VStack(alignment: .leading, spacing: 8) {
                         TextEditor(text: $draftConfig.systemMessage)
-                            .frame(minHeight: 100)
+                            .frame(height: 150)
                             .listRowSeparator(.hidden)
                             .scrollContentBackground(.hidden)
                             .onChange(of: draftConfig.systemMessage) {
