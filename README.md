@@ -1,4 +1,4 @@
-# llamapad
+# llamapad ('simple-example' branch)
 
 A simple example of how to use [llama.cpp](https://github.com/ggml-org/llama.cpp/) for a 
 chat-style application that compiles on MacOS as well as iOS targets. The goal is to have
@@ -31,6 +31,7 @@ built in script to build the apple frameworks required by the Xcode project.
 
 ```bash
 git clone --recurse-submodules https://github.com/invisiblebydaylight/llamapad.git
+git checkout simple-example
 cd llamapad/llama.cpp
 ./build-xcframework.sh
 cd ..
@@ -41,6 +42,20 @@ something like an iPad, you may have to change your Signing credentials for the 
 and runs on the target device.
 
 
+## Purpose
+
+The 'simple-example' branch of this project is meant to hold a version of this project that is stripped
+down in features to the 'bare minimum' needed for a good AI chat experience on MacOS and iOS via Swift.
+It's not meant to be a fully featured application, rather it shows what a more fleshed out 'hello world'
+style app might look like in the [llama.cpp](https://github.com/ggml-org/llama.cpp/) ecosystem.
+
+If you want the full LlamaPad experience, switch back to the 'main' branch or pursue 'dev', which should
+be where all the active development changes are happening.
+
+Also note that this branch will not be monitored as closely for bug now that it's branched off from main.
+If you spot a problem with it, please open up an issue or discussion to raise attention.
+
+
 ## Known Limitations
 
 * **Warning:** Loading two different,'larger' GGUF models (on my iPad Pro M5, this can be two ~7GB files)
@@ -48,29 +63,6 @@ and runs on the target device.
   model. Once you've switched to the different model, you can set the `Layers to offload` back to `999`
   or whatever value you want. See 'Implementation Notes' for more details.
 * Currently doesn't support loading BF16 GGUF files. See 'Implementation Notes' for more details.
-
-
-## Future Goals
-
-Right now, the 'main' branch consists of what will eventually be tagged as 'simple-example'. It's
-the version of this application that is essentially like a minimum viable product for AI chatting:
-it has the scrollable chat bubble history, the input widgets, the basic model and sampler configuration
-and all the bits required to use [llama.cpp](https://github.com/ggml-org/llama.cpp/) as the embedded
-text inference engine so that users just need this app and a GGUF file of their choosing.
-
-Eventually, if interest continues, this application will get more features developed to make it
-a more robust experience:
-
-* Multiple chatlog support so that many conversations can be archived without wiping the chatlog clean.
-* Multiple model configuration support to make using many models easier.
-* Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
-* Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
-* Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
-  or memory systems.
-
-If these features get implemented, the original version of this app will get moved to its own branch
-so that people looking to get started using [llama.cpp](https://github.com/ggml-org/llama.cpp/) in
-Swift apps for MacOS or iOS can have something more substantial to reference.
 
 
 ## Implementation Notes
