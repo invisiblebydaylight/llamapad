@@ -52,12 +52,6 @@ and runs on the target device.
 
 ## Future Goals
 
-Right now, the 'main' branch consists of what will eventually be tagged as 'simple-example'. It's
-the version of this application that is essentially like a minimum viable product for AI chatting:
-it has the scrollable chat bubble history, the input widgets, the basic model and sampler configuration
-and all the bits required to use [llama.cpp](https://github.com/ggml-org/llama.cpp/) as the embedded
-text inference engine so that users just need this app and a GGUF file of their choosing.
-
 Eventually, if interest continues, this application will get more features developed to make it
 a more robust experience:
 
@@ -68,9 +62,17 @@ a more robust experience:
 * Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
   or memory systems.
 
-If these features get implemented, the original version of this app will get moved to its own branch
-so that people looking to get started using [llama.cpp](https://github.com/ggml-org/llama.cpp/) in
-Swift apps for MacOS or iOS can have something more substantial to reference.
+
+## Simple Developer Example
+
+The ['simple-example' branch](https://github.com/invisiblebydaylight/llamapad/tree/simple-example) 
+consists of the version of this application that is essentially like a minimum viable product for AI chatting:
+it has the scrollable chat bubble history, the input widgets, the basic model and sampler configuration
+and all the bits required to use [llama.cpp](https://github.com/ggml-org/llama.cpp/) as the embedded
+text inference engine so that users just need this app and a GGUF file of their choosing.
+
+It was branched off of 'main' before any major development on non-essential features started to
+keep a simple focus on just providing AI chatting functionality.
 
 
 ## Implementation Notes
