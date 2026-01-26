@@ -10,6 +10,12 @@ class AppState: ObservableObject {
     
     @Published var modelConfig: ModelConfiguration?
     
+    /// the loaded conversations the app is tracking
+    @Published var conversations: [ConversationMetadata] = []
+    
+    /// if present, indicates that the conversation matching that id is 'selected' in the application
+    @Published var currentConversationID: UUID?
+    
     /// main storage for all of the messages in the log
     @Published var messageLog: [Message] = []
     
@@ -66,13 +72,19 @@ class AppState: ObservableObject {
             reportError("Configuration error: \(error.localizedDescription)")
         }
         
-        // next, try to load the chatlog file, if it exists
+        // next we refresh the conversation list and select the last one as activated
         do {
-            messageLog = try PersistenceService.loadChatLog()
-        } catch PersistenceError.fileNotFound {
-            // ignore this and don't report it; it'll freak out first time users
+            conversations = try ConversationService.listConversations()
+            if let lastConvo = conversations.first {
+                selectConversation(lastConvo.id)
+            } else {
+                let newConvo = try ConversationService.createConversation(title: "Untitled")
+                conversations.append(newConvo)
+                currentConversationID = newConvo.id
+                selectConversation(newConvo.id)
+            }
         } catch {
-            reportError("Chatlog error: \(error.localizedDescription)")
+            reportError("Conversations error: \(error.localizedDescription)")
         }
     }
     
@@ -96,7 +108,7 @@ class AppState: ObservableObject {
             await calculatePromptTokenCount()
         }
     }
-    
+        
     /// removes all the messages in the `messageLog` and resets the prompt token counter on a background Task
     func removeAllMessages() {
         messageLog.removeAll()
@@ -120,6 +132,33 @@ class AppState: ObservableObject {
             Task {
                 await calculatePromptTokenCount()
             }
+        }
+    }
+    
+    func selectConversation(_ id: UUID) {
+        // if we already have a selected conversation, save it out before
+        // loading the new one
+        if let currentID = currentConversationID {
+            do {
+                try ConversationService.saveChatLog(messageLog, for: currentID)
+            } catch {
+                reportError("selectConversation: Failed to save the chatlog for conversation \(currentID): \(error.localizedDescription)")
+                return
+            }
+        }
+        
+        // load the new conversation's chat log
+        do {
+            let newLog = try ConversationService.loadChatLog(for: id)
+            self.messageLog = newLog
+            self.currentConversationID = id
+            self.contextAnchorID = nil
+            Task {
+                await calculatePromptTokenCount()
+            }
+        } catch {
+            reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
+            return
         }
     }
     
@@ -217,7 +256,9 @@ class AppState: ObservableObject {
     /// Explicitly persists the current message log to disk.
     func saveChatLog() {
         do {
-            try PersistenceService.saveChatLog(messageLog)
+            if let currentID = currentConversationID {
+                try ConversationService.saveChatLog(messageLog, for: currentID)
+            }
         } catch {
             reportError("Warning: Failed to save chat log: \(error.localizedDescription)")
         }

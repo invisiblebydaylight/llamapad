@@ -26,8 +26,58 @@ enum PersistenceError: Error, LocalizedError {
 
 struct PersistenceService {
     private static let bundleID = Bundle.main.bundleIdentifier ?? "com.invisiblebydaylight.llamapad"
+    private static let appID = "llamapad"
+    private static let conversationFolder = "conversations"
     
-    private static func getAppDataDirectory() throws -> URL {
+    /// this gets the application directory in the user's documents folder
+    static func getAppDocsDirectory() throws -> URL {
+        let fileManager = FileManager.default
+        
+        do {
+            let appSupport = try fileManager.url(
+                for: .documentDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            
+            let folder = appSupport.appendingPathComponent(appID, isDirectory: true)
+            
+            try fileManager.createDirectory(
+                at: folder,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            
+            return folder
+        } catch {
+            throw PersistenceError.directoryCreationFailed(error)
+        }
+    }
+    
+    /// this gets the folder that should contain all of the conversations
+    static func getConversationsDirectory() throws -> URL {
+        let fileManager = FileManager.default
+        
+        do {
+            let appDocs = try getAppDocsDirectory()
+            let folder = appDocs.appendingPathComponent(conversationFolder, isDirectory: true)
+
+            try fileManager.createDirectory(
+                at: folder,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            
+            return folder
+        } catch {
+            throw PersistenceError.directoryCreationFailed(error)
+        }
+    }
+    
+    
+    /// this gets access to our application wide support directory
+    static func getAppDataDirectory() throws -> URL {
         let fileManager = FileManager.default
         
         do {
@@ -52,7 +102,7 @@ struct PersistenceService {
         }
     }
 
-    private static func save<T: Encodable>(_ data: T, to fileURL: URL) throws {
+    static func save<T: Encodable>(_ data: T, to fileURL: URL) throws {
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -66,7 +116,7 @@ struct PersistenceService {
         }
     }
 
-    private static func load<T: Decodable>(_ type: T.Type, from fileURL: URL) throws -> T {
+    static func load<T: Decodable>(_ type: T.Type, from fileURL: URL) throws -> T {
         do {
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 throw PersistenceError.fileNotFound
@@ -82,30 +132,22 @@ struct PersistenceService {
             throw PersistenceError.decodingFailed(error)
         }
     }
-        
-    private static func chatLogURL() throws -> URL {
-        let folder = try getAppDataDirectory()
-        return folder.appendingPathComponent("chatlog.json")
+    
+    /// gets a particular file URL from within the specified Conversation id
+    static func conversationFileUrl(for id: UUID, fileName: String) throws -> URL {
+        let allConvsFolder = try getConversationsDirectory()
+        let convFolder = allConvsFolder.appendingPathComponent(id.uuidString)
+        return convFolder.appendingPathComponent(fileName)
     }
-
+        
     private static func configFileURL() throws -> URL {
         let folder = try getAppDataDirectory()
         return folder.appendingPathComponent("config.json")
     }
 
-    static func loadChatLog() throws -> [Message] {
-        let url = try chatLogURL()
-        return try load([Message].self, from: url)
-    }
-    
     static func loadConfiguration() throws -> ModelConfiguration {
         let url = try configFileURL()
         return try load(ModelConfiguration.self, from: url)
-    }
-    
-    static func saveChatLog(_ log:[Message]) throws {
-        let url = try chatLogURL()
-        return try save(log, to: url)
     }
     
     static func saveConfiguration(_ config:ModelConfiguration) throws {
