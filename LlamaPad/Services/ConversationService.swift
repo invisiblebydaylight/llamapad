@@ -74,6 +74,7 @@ struct ConversationService {
         }
     }
 
+    /// deletes the whole conversation directory and all files in it.
     static func deleteConversation(id: UUID) throws {
         let root = try PersistenceService.getConversationsDirectory()
         let folder = root.appendingPathComponent(id.uuidString)

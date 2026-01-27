@@ -21,6 +21,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum.
+* Basic conversation based workflow, supporting many chatlogs.
 
 
 ## How To Install
@@ -55,7 +56,6 @@ and runs on the target device.
 Eventually, if interest continues, this application will get more features developed to make it
 a more robust experience:
 
-* Multiple chatlog support so that many conversations can be archived without wiping the chatlog clean.
 * Multiple model configuration support to make using many models easier.
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.

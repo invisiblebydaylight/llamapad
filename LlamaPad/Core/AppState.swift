@@ -46,7 +46,7 @@ class AppState: ObservableObject {
     
     /// used to track the processing status for the app (like prompt ingestion); 0.0..1.0 range.
     @Published var processingProgress: Double? = nil
-
+    
     /// describes the current processing task (e.g. "Processing Prompt...")
     @Published var processingStatus: String? = nil
     
@@ -108,7 +108,7 @@ class AppState: ObservableObject {
             await calculatePromptTokenCount()
         }
     }
-        
+    
     /// removes all the messages in the `messageLog` and resets the prompt token counter on a background Task
     func removeAllMessages() {
         messageLog.removeAll()
@@ -135,30 +135,66 @@ class AppState: ObservableObject {
         }
     }
     
-    func selectConversation(_ id: UUID) {
-        // if we already have a selected conversation, save it out before
-        // loading the new one
-        if let currentID = currentConversationID {
+    func selectConversation(_ id: UUID?) {
+        self.currentConversationID = id
+        self.contextAnchorID = nil
+        self.messageLog = []
+        
+        // load the new conversation's chat log
+        if let id = id {
             do {
-                try ConversationService.saveChatLog(messageLog, for: currentID)
+                let newLog = try ConversationService.loadChatLog(for: id)
+                self.messageLog = newLog
+                Task {
+                    await self.calculatePromptTokenCount()
+                }
             } catch {
-                reportError("selectConversation: Failed to save the chatlog for conversation \(currentID): \(error.localizedDescription)")
+                self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
                 return
             }
         }
-        
-        // load the new conversation's chat log
+    }
+    
+    func deleteConversation(for id: UUID) throws {
+        try ConversationService.deleteConversation(id: id)
+        conversations.removeAll(where: { $0.id == id })
+        if currentConversationID == id {
+            removeAllMessages()
+            currentConversationID = nil
+        }
+    }
+    
+    func createConversation() throws -> ConversationMetadata {
+        let newMeta = try ConversationService.createConversation(title: "New Discourse")
+        conversations.insert(newMeta, at: 0)
+        return newMeta
+    }
+    
+    /// returns the first instance of a ConversationMetadata that matches the `id` passed in, `nil` if missing
+    func getConversation(for id: UUID) -> ConversationMetadata? {
+        return self.conversations.first(where: {$0.id == id})
+    }
+    
+    func renameConversation(_ id: UUID, to newTitle: String) {
         do {
-            let newLog = try ConversationService.loadChatLog(for: id)
-            self.messageLog = newLog
-            self.currentConversationID = id
-            self.contextAnchorID = nil
-            Task {
-                await calculatePromptTokenCount()
+            try ConversationService.setTitle(for: id, newTitle: newTitle)
+            if let i = conversations.firstIndex(where: { $0.id == id}) {
+                var conv = conversations[i]
+                conv.title = newTitle
+                conv.updatedAt = Date()
+                conversations[i] = conv
             }
         } catch {
-            reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
-            return
+            reportError("Failed to rename: \(error.localizedDescription)")
+        }
+    }
+    
+    /// moves the specified conversation to the top of the list (note: updatedAt time not flushed to file system)
+    func touchConversation(id: UUID) {
+        if let index = conversations.firstIndex(where: { $0.id == id }) {
+            var updated = conversations.remove(at: index)
+            updated.updatedAt = Date()
+            conversations.insert(updated, at: 0)
         }
     }
     
@@ -308,6 +344,7 @@ class AppState: ObservableObject {
         
         // set the generation control flags appropriately and defer the reset of
         // the generation control flags to their default state
+        let thisConversationID = currentConversationID
         self.isGenerating = true
         self.shouldStopGenerating = false
         defer {
@@ -404,6 +441,9 @@ class AppState: ObservableObject {
         
         // make sure to serialize as the final step so nothing's lost
         saveChatLog()
+        if let id = thisConversationID {
+            touchConversation(id: id)
+        }
     }
     
     /// a rough token estimation (1 token ≈ 4 chars for English text) is used if a loaded model cannot tokenize directly
