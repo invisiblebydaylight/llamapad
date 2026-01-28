@@ -139,11 +139,18 @@ struct ContentView: View {
                     // only show the context menu for the selected navigation link
                     if convo.id == selectedConversationID {
                         Button {
+                            duplicateConversation(convo)
+                        } label: {
+                            Label("Duplicate", systemImage: "doc.on.doc")
+                        }
+                        
+                        Button {
                             renamedTitle = convo.title
                             isShowingRenameAlert = true
                         } label: {
                             Label("Rename", systemImage: "pencil")
                         }
+                        
                         Button(role: .destructive) {
                             deleteConversation(convo)
                         } label: {
@@ -241,6 +248,19 @@ struct ContentView: View {
         
     private func deleteConversation(_ convo: ConversationMetadata) {
         isShowingDeleteConfirmation = true
+    }
+    
+    private func duplicateConversation(_ convo: ConversationMetadata) {
+        do {
+            if let dupe = try appState.duplicateConversation(for: convo.id) {
+                // ensure that we select everything with the new duplicate
+                appState.currentConversationID = dupe.id
+                selectedConversationID = dupe.id
+                selectedConversationMeta = dupe
+            }
+        } catch {
+            appState.reportError("Failed to duplicate the conversation: \(error.localizedDescription)")
+        }
     }
 }
 

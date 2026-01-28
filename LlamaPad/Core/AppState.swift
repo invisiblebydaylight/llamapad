@@ -150,9 +150,21 @@ class AppState: ObservableObject {
                 }
             } catch {
                 self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
-                return
             }
         }
+    }
+    
+    /// duplicates the conversation and then inserts it into the runtime `conversations` list
+    func duplicateConversation(for id: UUID) throws -> ConversationMetadata? {
+        do {
+            let dupe = try ConversationService.duplicateConversation(id: id)
+            conversations.insert(dupe, at: 0)
+            currentConversationID = dupe.id
+            return dupe
+        } catch {
+            reportError("Failed to duplicate convesration \(id): \(error.localizedDescription)")
+        }
+        return nil
     }
     
     func deleteConversation(for id: UUID) throws {

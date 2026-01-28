@@ -38,6 +38,36 @@ struct ConversationService {
         return newMeta
     }
     
+    /// creates a duplicate `ConversationMetadata` by duplicating the fielsystem folder for the conversation
+    /// and updating the `id`, `title` and `createdAt` fields, appropriately. the resulting duplicate
+    /// is returned.
+    static func duplicateConversation(id: UUID) throws -> ConversationMetadata {
+        let root = try PersistenceService.getConversationsDirectory()
+        let sourceURL = root.appendingPathComponent(id.uuidString)
+        
+        // generate a fresh UUID for the new conversation
+        let newID = UUID()
+        let destURL = root.appendingPathComponent(newID.uuidString)
+        
+        // perform the recursive filesystem copy.
+        try FileManager.default.copyItem(at: sourceURL, to: destURL)
+        
+        // adjust the new copy's metadata
+        let oldMeta = try loadMetadata(for: newID)
+        let newMeta = ConversationMetadata(
+            id: newID,
+            title: "\(oldMeta.title) (Copy)",
+            createdAt: oldMeta.createdAt,
+            updatedAt: Date(),
+            systemMessage: oldMeta.systemMessage
+        )
+        
+        // overwrite the metadata file in the new directory with the corrected data.
+        try saveMetadata(newMeta)
+        
+        return newMeta
+    }
+    
     /// sets the new title in the Metadata, bumps the `updatedAt` time and
     /// then savs it out to the filesystem
     static func setTitle(for id: UUID, newTitle:String) throws {
