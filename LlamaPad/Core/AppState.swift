@@ -175,6 +175,7 @@ class AppState: ObservableObject {
         return self.conversations.first(where: {$0.id == id})
     }
     
+    /// renames the conversation and saves the metadata out to file as well
     func renameConversation(_ id: UUID, to newTitle: String) {
         do {
             try ConversationService.setTitle(for: id, newTitle: newTitle)
@@ -187,6 +188,15 @@ class AppState: ObservableObject {
         } catch {
             reportError("Failed to rename: \(error.localizedDescription)")
         }
+    }
+    
+    /// updates the first existing conversation that matches the id with the instance provided
+    /// and saves the metadata file
+    func updateConversation(id: UUID, withMeta: ConversationMetadata) throws {
+        if let i = conversations.firstIndex(where: { $0.id == id}) {
+            conversations[i] = withMeta
+        }
+        try ConversationService.saveMetadata(withMeta)
     }
     
     /// moves the specified conversation to the top of the list (note: updatedAt time not flushed to file system)
@@ -325,9 +335,11 @@ class AppState: ObservableObject {
         let processedMessages = await prepareMessagesForPrompt()
         
         do {
+            let conv = conversations.first(where: {$0.id == currentConversationID})
+            let systemMessage = conv?.systemMessage ?? ""
             return try await llamaContext.formatPrompt(
                 messages: processedMessages,
-                systemMessage: config.systemMessage,
+                systemMessage: systemMessage,
                 template: config.chatTemplate,
                 isContinue: isContinue)
         } catch {

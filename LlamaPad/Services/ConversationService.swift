@@ -8,7 +8,7 @@ struct ConversationService {
     /// sorted by most recently updated.
     static func listConversations() throws -> [ConversationMetadata] {
         let root = try PersistenceService.getConversationsDirectory()
-        print("DEBUG: Root URL: \(root.path)")
+        //print("DEBUG: Root Conversations directory URL: \(root.path)")
         let directories = try FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -38,6 +38,8 @@ struct ConversationService {
         return newMeta
     }
     
+    /// sets the new title in the Metadata, bumps the `updatedAt` time and
+    /// then savs it out to the filesystem
     static func setTitle(for id: UUID, newTitle:String) throws {
         if var meta = try? loadMetadata(for: id) {
             meta.title = newTitle
@@ -46,6 +48,16 @@ struct ConversationService {
         }
     }
 
+    /// sets the new system message in the Metadata, bumps the `updatedAt` time and
+    /// then savs it out to the filesystem
+    static func setSystemMessage(for id: UUID, newMsg:String?) throws {
+        if var meta = try? loadMetadata(for: id) {
+            meta.systemMessage = newMsg
+            meta.updatedAt = Date()
+            try saveMetadata(meta)
+        }
+    }
+    
     static func loadChatLog(for id: UUID) throws -> [Message] {
         let url = try PersistenceService.conversationFileUrl(for: id, fileName: chatLogFile)
         return try PersistenceService.load([Message].self, from: url)
@@ -83,12 +95,12 @@ struct ConversationService {
         }
     }
 
-    private static func loadMetadata(for id: UUID) throws -> ConversationMetadata {
+    static func loadMetadata(for id: UUID) throws -> ConversationMetadata {
         let url = try PersistenceService.conversationFileUrl(for: id, fileName: metadataFile)
         return try PersistenceService.load(ConversationMetadata.self, from: url)
     }
 
-    private static func saveMetadata(_ meta: ConversationMetadata) throws {
+    static func saveMetadata(_ meta: ConversationMetadata) throws {
         let url = try PersistenceService.conversationFileUrl(for: meta.id, fileName: metadataFile)
         let directory = url.deletingLastPathComponent()
         

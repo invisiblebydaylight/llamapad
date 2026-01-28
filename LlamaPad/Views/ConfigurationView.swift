@@ -15,6 +15,10 @@ struct ConfigurationView: View {
     
     /// Draft configuration - all edits happen here
     @StateObject private var draftConfig: ModelConfiguration
+    
+    /// the proxy of the real system message value for this View;
+    /// must be synced to the real system message if settings are saved.
+    @State private var localSystemMessage: String
 
     /// keeps track of the token count for the system message text
     @State private var systemMessageTokenCount: Int = 0
@@ -25,6 +29,13 @@ struct ConfigurationView: View {
         let baseConfig = appState.modelConfig ?? ModelConfiguration()
         _draftConfig = StateObject(wrappedValue: ModelConfiguration(baseConfig))
         templateNames = getBuiltinTemplateNames()
+        
+        localSystemMessage = ""
+        if let id = appState.currentConversationID {
+            if let conv = appState.conversations.first(where: { $0.id == id }) {
+                localSystemMessage = conv.systemMessage ?? ""
+            }
+        }
     }
  
     
@@ -246,18 +257,23 @@ struct ConfigurationView: View {
                 
                 DisclosureGroup(isExpanded: $isSysMsgExpanded) {
                     VStack(alignment: .leading, spacing: 8) {
-                        TextEditor(text: $draftConfig.systemMessage)
+                        TextEditor(text: $localSystemMessage)
                             .frame(height: 150)
                             .listRowSeparator(.hidden)
                             .scrollContentBackground(.hidden)
-                            .onChange(of: draftConfig.systemMessage) {
+                            .onChange(of: localSystemMessage) {
                                 Task {
-                                    systemMessageTokenCount = await appState.getTokenCount(for: draftConfig.systemMessage)
+                                    systemMessageTokenCount = await appState.getTokenCount(for: localSystemMessage)
                                 }
                             }
                             .onAppear(){
+                                if let id = appState.currentConversationID {
+                                    if let convo = appState.conversations.first(where: { $0.id == id }) {
+                                        localSystemMessage = convo.systemMessage ?? ""
+                                    }
+                                }
                                 Task {
-                                    systemMessageTokenCount = await appState.getTokenCount(for: draftConfig.systemMessage)
+                                    systemMessageTokenCount = await appState.getTokenCount(for: localSystemMessage)
                                 }
                             }
 
@@ -302,11 +318,23 @@ struct ConfigurationView: View {
                             
                             appState.modelConfig = ModelConfiguration(draftConfig)
                             do {
+                                // save out the configuration and if one of the settings that requires
+                                // reloading was changed, then we reload the model here as well.
                                 try PersistenceService.saveConfiguration(draftConfig)
                                 if needsReload {
                                     await appState.reloadModel()
                                 } else {
                                     await appState.calculatePromptTokenCount()
+                                }
+                                
+                                // sync our proxied system message String back to the conversation
+                                // metadata file.
+                                if let id = appState.currentConversationID {
+                                    if var conv = appState.getConversation(for: id) {
+                                        conv.systemMessage = localSystemMessage
+                                        conv.updatedAt = Date()
+                                        try appState.updateConversation(id: id, withMeta: conv)
+                                    }
                                 }
                             } catch {
                                 errorMessage = error.localizedDescription

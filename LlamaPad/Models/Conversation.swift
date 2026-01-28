@@ -14,4 +14,7 @@ struct ConversationMetadata: Identifiable, Codable {
     
     /// timestap for when the conversation was laste updated
     var updatedAt: Date
+    
+    /// the system message to use for this conversation
+    var systemMessage: String?
 }

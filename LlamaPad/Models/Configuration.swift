@@ -4,7 +4,6 @@ import SwiftUI
 class ModelConfiguration: ObservableObject, Codable {
     @Published var modelPath: String = ""
     @Published var modelBookmark: Data? = nil
-    @Published var systemMessage: String = "You are a helpful assistant."
     @Published var chatTemplate: String? = nil
     @Published var contextLength: Int = 4096
     @Published var maxGenerationLength: Int = 0
@@ -13,7 +12,7 @@ class ModelConfiguration: ObservableObject, Codable {
     @Published var customSampler: SamplerSettings = SamplerSettings()
 
     enum CodingKeys: String, CodingKey {
-        case modelPath, modelBookmark, systemMessage, chatTemplate, contextLength, maxGenerationLength, reservedContextBuffer, layerCountToOffload, customSampler
+        case modelPath, modelBookmark, chatTemplate, contextLength, maxGenerationLength, reservedContextBuffer, layerCountToOffload, customSampler
     }
 
     init() {}
@@ -23,7 +22,6 @@ class ModelConfiguration: ObservableObject, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         modelPath = try container.decode(String.self, forKey: .modelPath)
         modelBookmark = try container.decodeIfPresent(Data.self, forKey: .modelBookmark)
-        systemMessage = try container.decode(String.self, forKey: .systemMessage)
         chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
         contextLength = try container.decode(Int.self, forKey: .contextLength)
         maxGenerationLength = try container.decode(Int.self, forKey: .maxGenerationLength)
@@ -36,7 +34,6 @@ class ModelConfiguration: ObservableObject, Codable {
     init(_ other: ModelConfiguration) {
         self.modelPath = other.modelPath
         self.modelBookmark = other.modelBookmark
-        self.systemMessage = other.systemMessage
         self.chatTemplate = other.chatTemplate
         self.contextLength = other.contextLength
         self.maxGenerationLength = other.maxGenerationLength
@@ -49,7 +46,6 @@ class ModelConfiguration: ObservableObject, Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(modelPath, forKey: .modelPath)
         try container.encode(modelBookmark, forKey: .modelBookmark)
-        try container.encode(systemMessage, forKey: .systemMessage)
         try container.encode(chatTemplate, forKey: .chatTemplate)
         try container.encode(contextLength, forKey: .contextLength)
         try container.encode(maxGenerationLength, forKey: .maxGenerationLength)
