@@ -24,7 +24,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * Basic conversation based workflow, supporting many chatlogs.
 
 ### Recent changes (newer to older):
-* Duplication of conversations
+* Conversations can be created, renamed, duplicated and deleted
 * System message is now in conversation metadata
 * Multiple conversation support which includes turning the 'chatlog' concept
   from single-file to folder-structure with multiple files
