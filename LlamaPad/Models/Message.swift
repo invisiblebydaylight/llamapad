@@ -5,6 +5,7 @@ import SwiftUI
 enum MessageSender: String, Codable {
     case user = "user"
     case ai = "ai"
+    case system = "system"
 }
 
 class Message: ObservableObject, Identifiable, Codable {

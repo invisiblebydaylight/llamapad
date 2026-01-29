@@ -125,12 +125,19 @@ struct ConfigurationView: View {
                                 draftConfig.chatTemplate = (newValue == "None") ? nil : newValue
                             }
                         )) {
-                            Text("Autodetect").tag("None")
+                            Text("Jinja / Autodetect").tag("None")
                             ForEach(templateNames, id: \.self) { name in
                                 Text(name).tag(name)
                             }
                         }
                         .pickerStyle(.menu)  // Makes it compact and native
+                    }
+                    
+                    HStack {
+                        Toggle("Enable Reasoning", isOn: $draftConfig.enableThinking)
+                            .help("If supported by the model's chat template, this toggles the <think> block.")
+                            .disabled(draftConfig.chatTemplate != nil)
+                            .opacity(draftConfig.chatTemplate != nil ? 0.5 : 1.0)
                     }
                 }
 

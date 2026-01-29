@@ -416,6 +416,8 @@ actor LlamaContext: Sendable {
                 role = "user"
             case .ai:
                 role = "assistant"
+            case .system:
+                role = "system"
             }
             
             // create C strings and throw an error if this fails
@@ -504,6 +506,32 @@ actor LlamaContext: Sendable {
 
         _ = llama_token_to_piece(vocab, token, buffer, Int32(length), 0, includeSpecials)
         return Array(UnsafeBufferPointer(start: buffer, count: length))
+    }
+    
+    /// pulls the Jinja chat template string from the loaded model.
+    func getChatTemplate() -> String? {
+        guard let model = self.model else { return nil }
+        
+        let cTemplate = llama_model_chat_template(model, nil)
+        guard let tmpl = cTemplate else { return nil }
+        
+        return String(cString: tmpl)
+    }
+
+    /// returns the string representation of the BOS (Beginning of Sentence) token.
+    func getBOSString() -> String {
+        guard let vocab else { return "" }
+        let bosToken = llama_vocab_bos(vocab)
+        let pieces = tokenToPiece(for: bosToken, includeSpecials: true)
+        return String(cString: pieces + [0])
+    }
+
+    /// returns the string representation of the EOS (End of Sentence) token.
+    func getEOSString() -> String {
+        guard let vocab else { return "" }
+        let eosToken = llama_vocab_eos(vocab)
+        let pieces = tokenToPiece(for: eosToken, includeSpecials: true)
+        return String(cString: pieces + [0])
     }
 
 }
