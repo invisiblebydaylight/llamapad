@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */ = {isa = PBXBuildFile; productRef = 1C199C6D2F2AA107009EB2D0 /* Jinja */; };
 		1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F8F2EFC54A5004893BF /* Metal.framework */; };
 		1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F942EFC54AE004893BF /* Accelerate.framework */; };
 		1C36EB132F0DB92700E0F1A6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C36EB122F0DB92700E0F1A6 /* AppIcon.icon */; };
@@ -67,6 +68,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */,
+				1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */,
 				1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */,
 				1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */,
 			);
@@ -126,6 +128,7 @@
 			);
 			name = LlamaPad;
 			packageProductDependencies = (
+				1C199C6D2F2AA107009EB2D0 /* Jinja */,
 			);
 			productName = LlamaPad;
 			productReference = 1C818A932EAEBB8400D864C9 /* LlamaPad.app */;
@@ -155,6 +158,9 @@
 			);
 			mainGroup = 1C818A8A2EAEBB8400D864C9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C818A942EAEBB8400D864C9 /* Products */;
 			projectDirPath = "";
@@ -459,6 +465,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-jinja.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C199C6D2F2AA107009EB2D0 /* Jinja */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */;
+			productName = Jinja;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1C818A8B2EAEBB8400D864C9 /* Project object */;
 }

@@ -346,7 +346,41 @@ class AppState: ObservableObject {
         // transform it into a Sendable tuple
         let processedMessages = await prepareMessagesForPrompt()
         
+        // add the system prompt this way.
+        var attemptingJinja = false
+        if config.chatTemplate == nil { // `nil` is jinja/autodetect
+            if let jinjaStr = await llamaContext.getChatTemplate() {
+                if let id = currentConversationID {
+                    if let conv = getConversation(for: id) {
+                        attemptingJinja = true
+                        var messages = processedMessages
+                        if let sysMsg = conv.systemMessage, sysMsg.isEmpty == false {
+                            // insert the system message as the first message in processedMessages
+                            messages = [(.system, sysMsg)] + messages
+                        }
+                        let templater = TemplateSevice.init(jinjaStr: jinjaStr)
+                        do {
+                            let prompt = try templater.render(
+                                messages: messages,
+                                addAssistant: !isContinue,
+                                enableThinking: config.enableThinking)
+                            return prompt
+                        } catch {
+                            print("WARNING: Failed to render jinja template: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        }
+        
         do {
+            if attemptingJinja {
+                // the only way to make it here is to have enough items to attempt a jinja run on the
+                // prompt building process only to have failed to generate a full prompt.
+                //
+                // for now we just print a warning about using the built-in templates...
+                print("WARNING: Embeded jinja failed for some reason; attemping fallback prompt processing...")
+            }
             let conv = conversations.first(where: {$0.id == currentConversationID})
             let systemMessage = conv?.systemMessage ?? ""
             return try await llamaContext.formatPrompt(
@@ -397,9 +431,15 @@ class AppState: ObservableObject {
             aiMessage = last
             fullResponse = last.content
         } else {
+            // a special case to handle on regular (non-continue) text generation is to
+            // see if the prompt ended in `<think>` because the template added in the
+            // thinking tag. If it does, I want to copy it into the message so that the
+            // thought detection works as intended.
+            let hasThinkingPlaceholder = prompt.trimmingSuffixWhitespace().hasSuffix("<think>")
+            
             // add placeholder AI message that we'll update as tokens arrive
-            aiMessage = Message(sender: .ai, content: "")
-            fullResponse = ""
+            aiMessage = Message(sender: .ai, content: hasThinkingPlaceholder ? "<think>" : "")
+            fullResponse = hasThinkingPlaceholder ? "<think>" : ""
             self.messageLog.append(aiMessage)
         }
         

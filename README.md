@@ -22,8 +22,11 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum.
 * Basic conversation based workflow, supporting many chatlogs.
+* Jinja support for prompt formatting using the [swift-jinja](https://github.com/huggingface/swift-jinja) library.
 
 ### Recent changes (newer to older):
+* Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
+  for prompt construction if possible; still can override to built-in templates from llama.cpp...
 * Conversations can be created, renamed, duplicated and deleted
 * System message is now in conversation metadata
 * Multiple conversation support which includes turning the 'chatlog' concept
@@ -64,6 +67,7 @@ Eventually, if interest continues, this application will get more features devel
 a more robust experience:
 
 * Multiple model configuration support to make using many models easier.
+* Tool call support ; MCP support
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
 * Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
@@ -80,6 +84,11 @@ text inference engine so that users just need this app and a GGUF file of their 
 
 It was branched off of 'main' before any major development on non-essential features started to
 keep a simple focus on just providing AI chatting functionality.
+
+
+## Dev Dependencies
+* [llama.cpp](https://github.com/ggml-org/llama.cpp/) is used as the primary AI inference engine.
+* [swift-jinja](https://github.com/huggingface/swift-jinja) is used as the embedded Jinja parser.
 
 
 ## Implementation Notes
