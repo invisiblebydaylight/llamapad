@@ -23,7 +23,6 @@ class Message: ObservableObject, Identifiable, Codable {
     @Published var content: String {
         didSet {
             parsedContent = ParsedMessage.parse(content)
-            markdownContent = LocalizedStringKey(parsedContent.responseContent)
         }
     }
     
@@ -31,10 +30,6 @@ class Message: ObservableObject, Identifiable, Codable {
     // content parsed into a separate string.
     @Published private(set) var parsedContent: ParsedMessage
     
-    // the `resposneContent` of the `parsedContent` message is cached
-    // here so that it can be rendered as markdown.
-    @Published private(set) var markdownContent: LocalizedStringKey
-            
     // keeps track of whether or not the 'think' block is expanded
     // in the UI for this message
     @Published var isThinkingExpanded: Bool = false
@@ -44,7 +39,6 @@ class Message: ObservableObject, Identifiable, Codable {
         self.content = content
         let parsedContent = ParsedMessage.parse(content)
         self.parsedContent = parsedContent
-        self.markdownContent = LocalizedStringKey(parsedContent.responseContent)
     }
 
     required convenience init(from decoder: Decoder) throws {

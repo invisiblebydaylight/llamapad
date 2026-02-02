@@ -14,6 +14,7 @@
 		1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; };
 		1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1C437B6E2EB1B12A000E4236 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 1C437B6D2EB1B12A000E4236 /* README.md */; };
+		1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */ = {isa = PBXBuildFile; productRef = 1C72F3032F3125BF0009D925 /* MarkdownView */; };
 		1C8FF5812EF0CF3000F7F4A2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 1C8FF5802EF0CF3000F7F4A2 /* LICENSE */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +72,7 @@
 				1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */,
 				1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */,
 				1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */,
+				1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,6 +131,7 @@
 			name = LlamaPad;
 			packageProductDependencies = (
 				1C199C6D2F2AA107009EB2D0 /* Jinja */,
+				1C72F3032F3125BF0009D925 /* MarkdownView */,
 			);
 			productName = LlamaPad;
 			productReference = 1C818A932EAEBB8400D864C9 /* LlamaPad.app */;
@@ -160,6 +163,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */,
+				1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C818A942EAEBB8400D864C9 /* Products */;
@@ -475,6 +479,14 @@
 				minimumVersion = 2.3.1;
 			};
 		};
+		1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/LiYanan2004/MarkdownView.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -482,6 +494,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */;
 			productName = Jinja;
+		};
+		1C72F3032F3125BF0009D925 /* MarkdownView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */;
+			productName = MarkdownView;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

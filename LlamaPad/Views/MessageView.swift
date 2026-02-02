@@ -1,10 +1,12 @@
 import SwiftUI
+import MarkdownView
 
 /// This view is the collapsable control that slides out the 'thought process' for the LLM if
 /// thinking tokens were returned.
 struct ThinkingView: View {
     let content: String
     let isThinking: Bool
+    let isUser: Bool
     @Binding var isExpanded: Bool
     
     var body: some View {
@@ -35,9 +37,10 @@ struct ThinkingView: View {
             
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(content)
+                    MarkdownView(content)
                         .textSelection(.enabled)
                         .font(.system(.caption, design: .monospaced))
+                        .tint(isUser ? .black : .blue, for: .inlineCodeBlock)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.bottom, 8)
@@ -203,6 +206,7 @@ struct MessageView: View {
                 ThinkingView(
                     content: thinking,
                     isThinking: isThinking,
+                    isUser: message.sender == .user,
                     isExpanded: $isThinkingExpanded)
             }
             
@@ -225,9 +229,10 @@ struct MessageView: View {
                         return .ignored
                     }
             } else {
-                Text(message.markdownContent)
+                MarkdownView(message.parsedContent.responseContent)
                     .textSelection(.enabled)
                     .padding(12)
+                    .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
             }
         }
         .background(message.sender == .user ?
