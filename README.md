@@ -69,6 +69,7 @@ a more robust experience:
 * Multiple model configuration support to make using many models easier.
 * Tool call support ; MCP support
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
+* Paralizable, batched requests that might be useful for behind-the-scenes agent stuff.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
 * Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
   or memory systems.

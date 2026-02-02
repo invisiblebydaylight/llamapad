@@ -225,7 +225,7 @@ struct MessageView: View {
                         return .ignored
                     }
             } else {
-                Text(message.parsedContent.responseContent)
+                Text(message.markdownContent)
                     .textSelection(.enabled)
                     .padding(12)
             }
