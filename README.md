@@ -31,7 +31,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * System message is now in conversation metadata
 * Multiple conversation support which includes turning the 'chatlog' concept
   from single-file to folder-structure with multiple files
-* KV cache optimizations for chatting
+* KV cache optimizations for chatting to minimize delays from prompt ingestion
 
 
 ## How To Install
@@ -54,10 +54,6 @@ and runs on the target device.
 
 ## Known Limitations
 
-* **Warning:** Loading two different,'larger' GGUF models (on my iPad Pro M5, this can be two ~7GB files)
-  will cause your iPad to reboot unless you set `Layers To Offload` to `0` in the configuration for the
-  model. Once you've switched to the different model, you can set the `Layers to offload` back to `999`
-  or whatever value you want. See 'Implementation Notes' for more details.
 * Currently doesn't support loading BF16 GGUF files. See 'Implementation Notes' for more details.
 
 
@@ -103,11 +99,6 @@ keep a simple focus on just providing AI chatting functionality.
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
 * The configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
-* The last known commit that fully worked with offloading to Metal is commit **0fa154e** 
-  from Sept 14, 2025 which comes right before the commit (9dcd200) which changed the way 
-  memory usage works. Now the memory doesn't seem to get released
-  when the context and model are released so subsequent model switches can cause swap thrashing on 
-  MacOS or worse yet, hard reboots on iPads. Not offloading layers to Metal resolves this behavior.
 * Specifically for iPad deployment on the new M5 chip the last fully supported commit is **b7f9010**, 
   the commit right before the Metal4 tensor API support (5b180c3). After that, a fix had do be introduced
   to disable BF16 support in Metal since it caused model load crashes on M5 systems:

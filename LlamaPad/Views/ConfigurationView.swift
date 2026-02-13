@@ -30,12 +30,14 @@ struct ConfigurationView: View {
         _draftConfig = StateObject(wrappedValue: ModelConfiguration(baseConfig))
         templateNames = getBuiltinTemplateNames()
         
-        localSystemMessage = ""
+        // make sure the state of the system message is setup appropriately
+        var initialSystemMessage = ""
         if let id = appState.currentConversationID {
             if let conv = appState.conversations.first(where: { $0.id == id }) {
-                localSystemMessage = conv.systemMessage ?? ""
+                initialSystemMessage = conv.systemMessage ?? ""
             }
         }
+        _localSystemMessage = .init(initialValue: initialSystemMessage);
     }
  
     
