@@ -247,6 +247,14 @@ struct ConfigurationView: View {
                         Stepper("", value: $draftConfig.reservedContextBuffer, in: 128...4096, step: 128)
                             .labelsHidden()
                     }
+                    HStack {
+                        Text("Context Runway")
+                        TextField("", value: $draftConfig.contextRunway, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
+                            .labelsHidden()
+                    }
+
                     // Reset Advanced button
                     Button("Reset Advanced to Defaults") {
                         draftConfig.customSampler = SamplerSettings()

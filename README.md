@@ -90,12 +90,13 @@ keep a simple focus on just providing AI chatting functionality.
 
 ## Implementation Notes
 
-* To maintain high performance during long conversation, LlamaPad uses a simple strategy for KV
-  cache management. Instead of sliding the context window on just about every message on a long
-  chatlog, it will 'anchor' the prompt to a chatlog message to add a minimum space of 
-  at least `reservedContextBuffer`, which is a variable set in the configuration file (and in the UI).
-  This means that enough tokens have to be added and generated to eclips the `reservedContextBuffer`
-  before the prompt's window into the chatlog slides again and causes a major prompt ingestion delay.
+### KV Cache & Context Anchoring
+To maintain high performance, LlamaPad uses an "anchored" window strategy. 
+- The `reservedContextBuffer` defines the minimum headroom kept for AI generation and thinking.
+- When the context usage exceeds `contextLength - reservedContextBuffer`, the window "slides" forward.
+- **The Runway Effect:** To prevent frequent, costly prompt re-ingestion, the window doesn't just slide by one message; it slides far enough to create a "runway" equal to the `contextRunway` amount. This means you will see a significant drop in context usage when the anchor moves (`reservedContextBuffer` + contextRunway), providing space for several turns of uninterrupted discourse.
+
+### iOS and MacOS
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
 * The configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`

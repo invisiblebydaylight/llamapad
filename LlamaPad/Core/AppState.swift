@@ -536,10 +536,17 @@ class AppState: ObservableObject {
         let numToPredict = await Int(llamaContext.numToPredict)
         var generationBudget = numToPredict
         if generationBudget == 0, let config = modelConfig {
-            generationBudget = config.reservedContextBuffer
+            generationBudget = max(0, config.reservedContextBuffer)
         }
-        
         let safetyThreshold = contextLength - generationBudget
+        
+        // get the length of the system message as well
+        var systemTokens = 0
+        if let id = currentConversationID, let conv = getConversation(for: id) {
+            if let sysMsg = conv.systemMessage, !sysMsg.isEmpty {
+                systemTokens = await getTokenCount(for: sysMsg) + perMessageOverhead
+            }
+        }
         
         // if we have a contextAnchorID for a message, then we only consider messages from
         // that message forward in time.
@@ -553,7 +560,8 @@ class AppState: ObservableObject {
         }
         
         // see if we can fit the current messages into our `safetyThreshold` from our anchor, onward
-        var totalTokens = 0
+        // start with the number of system tokens that already take up space...
+        var totalTokens = systemTokens
         for i in startIndex..<messageLog.count {
             let content = messageLog[i].parsedContent.responseContent
             totalTokens += await getTokenCount(for: content) + perMessageOverhead
@@ -562,8 +570,8 @@ class AppState: ObservableObject {
         if totalTokens > safetyThreshold {
             // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
             // so that the KV cache isn't constantly regenerating
-            let runwayTarget = (modelConfig?.reservedContextBuffer ?? numToPredict)
-            let limitWithRunway = safetyThreshold - runwayTarget
+            let runwayTarget = max(0, modelConfig?.contextRunway ?? numToPredict)
+            let limitWithRunway = max(0, safetyThreshold - runwayTarget)
             
             // slide the start index forward until we're under the limitWithRunway length
             while totalTokens > limitWithRunway && startIndex < messageLog.count - 1 {
