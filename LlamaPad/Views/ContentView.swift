@@ -161,7 +161,6 @@ struct ContentView: View {
             }
             .onDelete(perform: deleteConversations)
         }
-        .navigationTitle("Conversations")
         .navigationSplitViewStyle(.prominentDetail)
         .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 450)
         .toolbar {
@@ -179,8 +178,9 @@ struct ContentView: View {
                 .disabled(appState.isBusy)
                 .opacity(appState.isBusy ? 0.3 : 1.0)
         } detail: {
-            if selectedConversationID != nil {
+            if let id = selectedConversationID, let convo = appState.getConversation(for: id) {
                 mainChatLogView()
+                    .navigationTitle((convo.title.isEmpty ? "LlamaPad" : convo.title).truncated(to: 40))
             } else {
                 ContentUnavailableView(
                     "Select a Discourse",

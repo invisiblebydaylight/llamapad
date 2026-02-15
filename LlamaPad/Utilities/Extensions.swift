@@ -13,4 +13,10 @@ extension String {
         }
         removeSubrange(index(after: lastNonWhitespace)...)
     }
+    
+    /// returns a string that is not longer than `maxLength` with the final character being the `trailing` String.
+    func truncated(to maxLength: Int, trailing: String = "…") -> String {
+        guard self.count > maxLength else { return self }
+        return String(self.prefix(maxLength - trailing.count)) + trailing
+    }
 }
