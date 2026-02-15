@@ -181,6 +181,9 @@ struct ContentView: View {
             if let id = selectedConversationID, let convo = appState.getConversation(for: id) {
                 mainChatLogView()
                     .navigationTitle((convo.title.isEmpty ? "LlamaPad" : convo.title).truncated(to: 40))
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
             } else {
                 ContentUnavailableView(
                     "Select a Discourse",
