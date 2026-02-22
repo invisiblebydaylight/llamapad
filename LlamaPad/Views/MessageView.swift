@@ -213,7 +213,7 @@ struct MessageView: View {
                                     do {
                                         if armedButton != .Speak {
                                             armedButton = .Speak
-                                            try await voiceContext.speak(text: message.content, config: appState.modelConfig!.tts)
+                                            try await voiceContext.speak(text: message.parsedContent.responseContent, config: appState.modelConfig!.tts)
                                         }
                                     } catch {
                                         appState.reportError("Voice synthesis failed: \(error.localizedDescription)")
