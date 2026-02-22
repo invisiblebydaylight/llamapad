@@ -11,6 +11,11 @@
 		1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F8F2EFC54A5004893BF /* Metal.framework */; };
 		1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F942EFC54AE004893BF /* Accelerate.framework */; };
 		1C36EB132F0DB92700E0F1A6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C36EB122F0DB92700E0F1A6 /* AppIcon.icon */; };
+		1C3C8B032F47BBBA00432D4D /* KokoroSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B022F47BBBA00432D4D /* KokoroSwift */; };
+		1C3C8B042F47BC0500432D4D /* KokoroSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B022F47BBBA00432D4D /* KokoroSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		1C3C8B0F2F47D0DE00432D4D /* Safetensors in Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B0E2F47D0DE00432D4D /* Safetensors */; };
+		1C3C8B122F47D68200432D4D /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B112F47D68200432D4D /* MLX */; };
+		1C3C8B142F47D6CC00432D4D /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B132F47D6CC00432D4D /* MLXNN */; };
 		1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; };
 		1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1C437B6E2EB1B12A000E4236 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 1C437B6D2EB1B12A000E4236 /* README.md */; };
@@ -26,6 +31,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */,
+				1C3C8B042F47BC0500432D4D /* KokoroSwift in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +77,10 @@
 				1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */,
 				1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */,
 				1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */,
+				1C3C8B142F47D6CC00432D4D /* MLXNN in Frameworks */,
+				1C3C8B032F47BBBA00432D4D /* KokoroSwift in Frameworks */,
+				1C3C8B122F47D68200432D4D /* MLX in Frameworks */,
+				1C3C8B0F2F47D0DE00432D4D /* Safetensors in Frameworks */,
 				1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */,
 				1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */,
 			);
@@ -132,6 +142,10 @@
 			packageProductDependencies = (
 				1C199C6D2F2AA107009EB2D0 /* Jinja */,
 				1C72F3032F3125BF0009D925 /* MarkdownView */,
+				1C3C8B022F47BBBA00432D4D /* KokoroSwift */,
+				1C3C8B0E2F47D0DE00432D4D /* Safetensors */,
+				1C3C8B112F47D68200432D4D /* MLX */,
+				1C3C8B132F47D6CC00432D4D /* MLXNN */,
 			);
 			productName = LlamaPad;
 			productReference = 1C818A932EAEBB8400D864C9 /* LlamaPad.app */;
@@ -164,6 +178,9 @@
 			packageReferences = (
 				1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */,
 				1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */,
+				1C3C8B012F47BBBA00432D4D /* XCRemoteSwiftPackageReference "kokoro-ios" */,
+				1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */,
+				1C3C8B102F47D68200432D4D /* XCRemoteSwiftPackageReference "mlx-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C818A942EAEBB8400D864C9 /* Products */;
@@ -479,6 +496,30 @@
 				minimumVersion = 2.3.1;
 			};
 		};
+		1C3C8B012F47BBBA00432D4D /* XCRemoteSwiftPackageReference "kokoro-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mlalma/kokoro-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.11;
+			};
+		};
+		1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jkrukowski/swift-safetensors";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.1;
+			};
+		};
+		1C3C8B102F47D68200432D4D /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.30.2;
+			};
+		};
 		1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/LiYanan2004/MarkdownView.git";
@@ -494,6 +535,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */;
 			productName = Jinja;
+		};
+		1C3C8B022F47BBBA00432D4D /* KokoroSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C3C8B012F47BBBA00432D4D /* XCRemoteSwiftPackageReference "kokoro-ios" */;
+			productName = KokoroSwift;
+		};
+		1C3C8B0E2F47D0DE00432D4D /* Safetensors */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */;
+			productName = Safetensors;
+		};
+		1C3C8B112F47D68200432D4D /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C3C8B102F47D68200432D4D /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		1C3C8B132F47D6CC00432D4D /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C3C8B102F47D68200432D4D /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
 		};
 		1C72F3032F3125BF0009D925 /* MarkdownView */ = {
 			isa = XCSwiftPackageProductDependency;

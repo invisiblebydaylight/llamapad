@@ -8,7 +8,7 @@ class AppState: ObservableObject {
     /// track security access for it.
     private var currentModelURL: URL?
     
-    @Published var modelConfig: ModelConfiguration?
+    @Published var modelConfig: AppConfiguration?
     
     /// the loaded conversations the app is tracking
     @Published var conversations: [ConversationMetadata] = []

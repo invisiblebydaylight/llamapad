@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ModelConfigTab: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var draftConfig: ModelConfiguration
+    @ObservedObject var draftConfig: AppConfiguration
     @Binding var showingFilePicker: Bool
     
     @State private var isAdvSamplerExpanded = false

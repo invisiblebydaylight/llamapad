@@ -19,19 +19,25 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native on-device text generation.
   **Nothing is sent to the cloud.**
 * AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
+* Text-to-speech support for AI messages.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum.
 * Basic conversation based workflow, supporting many chatlogs.
 * Jinja support for prompt formatting using the [swift-jinja](https://github.com/huggingface/swift-jinja) library.
 
+
 ### Recent changes (newer to older):
+* Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
+  [kokoro-ios](https://github.com/mlalma/kokoro-ios) library. This uses an embedded 
+  [MisakiSwift](https://github.com/mlalma/MisakiSwift) Grapheme-to-Phoneme engine and should be 
+  self-contained, though languages other than English might not be supported well.
 * Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
   for prompt construction if possible; still can override to built-in templates from llama.cpp...
-* Conversations can be created, renamed, duplicated and deleted
-* System message is now in conversation metadata
+* Conversations can be created, renamed, duplicated and deleted.
+* System message is now in conversation metadata.
 * Multiple conversation support which includes turning the 'chatlog' concept
-  from single-file to folder-structure with multiple files
-* KV cache optimizations for chatting to minimize delays from prompt ingestion
+  from single-file to folder-structure with multiple files.
+* KV cache optimizations for chatting to minimize delays from prompt ingestion.
 
 
 ## How To Install

@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct MainApp: App {
     @StateObject var appState = AppState()
+    @StateObject var voiceContext = VoiceContext()
+    
     @ApplicationDelegateAdaptor(LlamaPadAppDelegate.self) var appDelegate
 
     init() {
@@ -19,6 +21,7 @@ struct MainApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(voiceContext)
                 .frame(minWidth: 800, minHeight: 600)
                 .onAppear {
                     appDelegate.appState = appState

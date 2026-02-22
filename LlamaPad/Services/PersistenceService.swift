@@ -145,12 +145,12 @@ struct PersistenceService {
         return folder.appendingPathComponent("config.json")
     }
 
-    static func loadConfiguration() throws -> ModelConfiguration {
+    static func loadConfiguration() throws -> AppConfiguration {
         let url = try configFileURL()
-        return try load(ModelConfiguration.self, from: url)
+        return try load(AppConfiguration.self, from: url)
     }
     
-    static func saveConfiguration(_ config:ModelConfiguration) throws {
+    static func saveConfiguration(_ config:AppConfiguration) throws {
         let url = try configFileURL()
         return try save(config, to: url)
     }
