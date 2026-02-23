@@ -24,7 +24,10 @@ class VoiceContext: ObservableObject {
     @Published var isPlaying = false
     @Published var isReady = false
     @Published var lastError: String?
-    
+
+    /// this tracks the currently played message, if the data is provided
+    @Published var speakingMessageID: UUID?
+
     /// this should be set to true while the models are loading
     private var isLoadingModel = false
     
@@ -117,7 +120,9 @@ class VoiceContext: ObservableObject {
         
     // does the TTS transformation of the supplied text String and then
     // plays the audio out.
-    func speak(text: String, config: TTSConfiguration, lang: Language = .enUS) async throws {
+    func speak(text: String, config: TTSConfiguration, messageId: UUID?, lang: Language = .enUS) async throws {
+        speakingMessageID = messageId
+        
         // if we haven't loaded the model yet, give that a shot
         if !isLoaded {
             try await load(from: config)
@@ -174,6 +179,7 @@ class VoiceContext: ObservableObject {
             guard let self = self else { return }
             Task { @MainActor in
                 self.isPlaying = false
+                self.speakingMessageID = nil
             }
         })
         
@@ -187,6 +193,7 @@ class VoiceContext: ObservableObject {
         playerNode.stop()
         audioEngine.stop()
         isPlaying = false
+        speakingMessageID = nil
     }
     
     func unload() {
@@ -195,6 +202,7 @@ class VoiceContext: ObservableObject {
         currentVoice = nil
         isReady = false
         isPlaying = false
+        speakingMessageID = nil
         
         // release the sandbox hold on the files
         currentModelURL?.stopAccessingSecurityScopedResource()

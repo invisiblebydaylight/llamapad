@@ -19,7 +19,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native on-device text generation.
   **Nothing is sent to the cloud.**
 * AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
-* Text-to-speech support for AI messages.
+* Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum.
 * Basic conversation based workflow, supporting many chatlogs.

@@ -49,6 +49,10 @@ class AppState: ObservableObject {
     
     /// describes the current processing task (e.g. "Processing Prompt...")
     @Published var processingStatus: String? = nil
+
+    /// a callback that gets called on completion, if supplied, with the new message that was generated.
+    /// this callback is skipped if the generation is cancled by the user with `shouldStopGenerating`
+    var onGenerationFinished: ((Message) -> Void)?
     
     /// returns `true` if the app is currently performing a long, heavy action
     /// like loading a model or generating a reply - something that should not be interrupted.
@@ -507,6 +511,11 @@ class AppState: ObservableObject {
         saveChatLog()
         if let id = thisConversationID {
             touchConversation(id: id)
+        }
+        
+        // call the callback, but only if we didn't cancel it
+        if !self.shouldStopGenerating {
+            self.onGenerationFinished?(aiMessage)
         }
     }
     

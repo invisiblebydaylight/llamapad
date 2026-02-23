@@ -25,6 +25,20 @@ struct MainApp: App {
                 .frame(minWidth: 800, minHeight: 600)
                 .onAppear {
                     appDelegate.appState = appState
+                    
+                    // we setup our callback for newly generated messages here to avoid
+                    // coupling AppState any further.
+                    appState.onGenerationFinished = { message in
+                        if let config = appState.modelConfig, config.tts.autoPlayEnabled, config.tts.isEnabled {
+                            Task {
+                                try? await voiceContext.speak(
+                                    text: message.parsedContent.responseContent,
+                                    config: config.tts,
+                                    messageId: message.id
+                                )
+                            }
+                        }
+                    }
                 }
         }
     }
