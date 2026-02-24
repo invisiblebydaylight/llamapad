@@ -51,6 +51,7 @@ struct ConfigurationView: View {
     }
 
     var body: some View {
+        NavigationStack {
             TabView {
                 ModelConfigTab(appState: appState, draftConfig: draftConfig, showingFilePicker: $showingFilePicker).tabItem {
                     Label("Model", systemImage: "cpu")
@@ -91,17 +92,18 @@ struct ConfigurationView: View {
                     .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }
             }
-        .fileImporter(
-            isPresented: $showingFilePicker,
-            allowedContentTypes: [UTType(importedAs: "com.invisiblebydaylight.llamapad.gguf")],
-            allowsMultipleSelection: false
-        ) { result in
-            handleModelSelect(result)
-        }
-        .alert("Configuration Error", isPresented: $showingError) {
-            Button("OK") {}
-        } message: {
-            Text(errorMessage)
+            .fileImporter(
+                isPresented: $showingFilePicker,
+                allowedContentTypes: [UTType(importedAs: "com.invisiblebydaylight.llamapad.gguf")],
+                allowsMultipleSelection: false
+            ) { result in
+                handleModelSelect(result)
+            }
+            .alert("Configuration Error", isPresented: $showingError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
     

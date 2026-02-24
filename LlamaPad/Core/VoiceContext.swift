@@ -31,8 +31,8 @@ class VoiceContext: ObservableObject {
     /// this should be set to true while the models are loading
     private var isLoadingModel = false
     
-    private let audioEngine = AVAudioEngine()
-    private let playerNode = AVAudioPlayerNode()
+    private let audioEngine: AVAudioEngine!
+    private let playerNode: AVAudioPlayerNode!
 
     // track the URLs used so we can stop accessing them on unload
     private var currentModelURL: URL?
@@ -49,15 +49,22 @@ class VoiceContext: ObservableObject {
     }
 
     init() {
-        let sampleRate = Double(KokoroTTS.Constants.samplingRate)
-        let outputFormat = audioEngine.mainMixerNode.outputFormat(forBus: 0)
-        let audioFormat = AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: outputFormat.channelCount
-        )!
-        
+        audioEngine = AVAudioEngine()
+        playerNode = AVAudioPlayerNode()
         audioEngine.attach(playerNode)
-        audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+        
+        #if os(iOS)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
+        } catch {
+            print("Error happened initializing TTS... \(error.localizedDescription)")
+        }
+        #endif
+        
+        let format = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+        audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: format)
     }
     
     /// loads the kokoro model safetensors file and the selected kokoro voice safetensors file and throws
@@ -148,11 +155,11 @@ class VoiceContext: ObservableObject {
     }
     
     private func playBuffer(_ audio: [Float]) throws {
-        let sampleRate = Double(KokoroTTS.Constants.samplingRate)
-        let outputFormat = audioEngine.mainMixerNode.outputFormat(forBus: 0)
         let audioFormat = AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: outputFormat.channelCount
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 24000,
+            channels: 1,
+            interleaved: false,
         )!
         
         guard let buffer = AVAudioPCMBuffer(
@@ -162,18 +169,19 @@ class VoiceContext: ObservableObject {
             throw VoiceError.bufferCreationFailed
         }
         
-        let channelCount = Int(outputFormat.channelCount)
-        buffer.frameLength = buffer.frameCapacity
-        
+        buffer.frameLength = AVAudioFrameCount(audio.count)
+        let channels = buffer.floatChannelData!
+        let dst: UnsafeMutablePointer<Float> = channels[0]
         audio.withUnsafeBufferPointer { buf in
-            buf.baseAddress!.withMemoryRebound(to: Float.self, capacity: buf.count) {
-                for channel in 0..<channelCount {
-                    buffer.floatChannelData![channel].initialize(from: $0, count: buf.count)
-                }
-            }
+            precondition(buf.baseAddress != nil)
+            let byteCount = buf.count * MemoryLayout<Float>.stride
+            UnsafeMutableRawPointer(dst)
+                .copyMemory(from: UnsafeRawPointer(buf.baseAddress!), byteCount: byteCount)
         }
-        
-        try audioEngine.start()
+
+        if !audioEngine.isRunning {
+            try audioEngine.start()
+        }
         
         playerNode.scheduleBuffer(buffer, completionHandler: { [weak self] in
             guard let self = self else { return }
@@ -182,11 +190,11 @@ class VoiceContext: ObservableObject {
                 self.speakingMessageID = nil
             }
         })
-        
+
         isPlaying = true
         playerNode.play()
         
-        //print("DEBUG: audio Length: " + String(format: "%.4f", Double(audio.count) / sampleRate))
+        //print("DEBUG: audio Length: " + String(format: "%.4f", Double(audio.count) / 24000))
     }
     
     func stopPlaying() {

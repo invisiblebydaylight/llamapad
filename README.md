@@ -110,6 +110,8 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
   the commit right before the Metal4 tensor API support (5b180c3). After that, a fix had do be introduced
   to disable BF16 support in Metal since it caused model load crashes on M5 systems:
   `setenv("GGML_METAL_BF16_DISABLE", "1", 1)`
+* Kokoro-ios is pinned to 1.0.10 because upgrading to 1.0.11 broke audio on iOS targets
+  (https://github.com/mlalma/KokoroTestApp/issues/7).
 
 
 ## License
