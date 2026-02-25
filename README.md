@@ -61,8 +61,9 @@ and runs on the target device.
 
 ## Known Limitations
 
-* Currently doesn't support loading BF16 GGUF files. See 'Implementation Notes' for more details.
 * Using quantized KV cache instead of F16 may cause problems with flash attention on some models.
+* Sometimes after a hard crash and reboot, you may need to go through the configuration options
+  and browse to the files again.
 * If you want to get wild and crazy with your Mac and increase the amount of memory usable
   by metal, you can run a command like this (which sets the limit to 20GB):
   `sudo sysctl iogpu.wired_limit_mb=20480`
@@ -111,10 +112,6 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
 * The configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
-* Specifically for iPad deployment on the new M5 chip the last fully supported commit is **b7f9010**, 
-  the commit right before the Metal4 tensor API support (5b180c3). After that, a fix had do be introduced
-  to disable BF16 support in Metal since it caused model load crashes on M5 systems:
-  `setenv("GGML_METAL_BF16_DISABLE", "1", 1)`
 * Kokoro-ios is pinned to 1.0.10 because upgrading to 1.0.11 broke audio on iOS targets
   (https://github.com/mlalma/KokoroTestApp/issues/7).
 
