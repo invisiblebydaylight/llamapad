@@ -12,16 +12,7 @@ struct ModelConfigTab: View {
         guard !draftConfig.modelPath.isEmpty else { return "No model selected" }
         return URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent
     }
-    
-    private var needsReload: Bool {
-        if let current = appState.modelConfig {
-            return (draftConfig.modelPath != current.modelPath) ||
-                   (draftConfig.contextLength != current.contextLength) ||
-                   (draftConfig.layerCountToOffload != current.layerCountToOffload)
-        }
-        return true
-    }
-    
+
     var body: some View {
         Form {
             Section("Model") {
@@ -47,7 +38,7 @@ struct ModelConfigTab: View {
                         .fixedSize()
                     }
                     
-                    if needsReload {
+                    if draftConfig.requiresReload(comparedTo: appState.modelConfig) {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
                             Text("Model settings changed and will reload upon save...").font(.caption)
@@ -215,10 +206,21 @@ struct ModelConfigTab: View {
                     Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
                         .labelsHidden()
                 }
-
+                
+                HStack {
+                    Text("KV Cache Type")
+                    Spacer()
+                    Picker("", selection: $draftConfig.kvCacheType) {
+                        ForEach(KVCacheType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }.pickerStyle(.menu)
+                }
+             
                 // Reset Advanced button
                 Button("Reset Advanced to Defaults") {
                     draftConfig.customSampler = SamplerSettings()
+                    draftConfig.kvCacheType = .f16
                 }
                 .buttonStyle(.borderless)
                 .foregroundColor(.blue)

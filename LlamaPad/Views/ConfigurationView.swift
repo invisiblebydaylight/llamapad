@@ -38,17 +38,6 @@ struct ConfigurationView: View {
         }
         _localSystemMessage = .init(initialValue: initialSystemMessage);
     }
-    
-    /// determines if the current `draftConfig` requires a context reload
-    private var needsReload: Bool {
-        if let current = appState.modelConfig  {
-            return (draftConfig.modelPath != current.modelPath) ||
-            (draftConfig.contextLength != current.contextLength) ||
-            (draftConfig.layerCountToOffload != current.layerCountToOffload)
-        }
-        
-        return true
-    }
 
     var body: some View {
         NavigationStack {
@@ -109,7 +98,7 @@ struct ConfigurationView: View {
     
     private func saveConfiguration() {
         Task {
-            let isModelReloadNeeded = needsReload
+            let isModelReloadNeeded = draftConfig.requiresReload(comparedTo: appState.modelConfig)
             let isVoiceReloadNeeded = appState.modelConfig == nil ||
                 (draftConfig.tts.modelPath != appState.modelConfig!.tts.modelPath) ||
                 (draftConfig.tts.voicePath != appState.modelConfig!.tts.voicePath)

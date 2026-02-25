@@ -7,6 +7,26 @@
 import Foundation
 import llama
 
+enum KVCacheType: String, Codable, CaseIterable {
+    case f16 = "F16 (None)"
+    case q8_0 = "Q8_0"
+    case q5_0 = "Q5_0"
+    case q5_1 = "Q5_1"
+    case q4_0 = "Q4_0"
+    case q4_1 = "Q4_1"
+    
+    nonisolated var ggmlType: llama.ggml_type {
+        switch self {
+        case .f16: return llama.GGML_TYPE_F16
+        case .q8_0: return llama.GGML_TYPE_Q8_0
+        case .q5_0: return llama.GGML_TYPE_Q5_0
+        case .q5_1: return llama.GGML_TYPE_Q5_1
+        case .q4_0: return llama.GGML_TYPE_Q4_0
+        case .q4_1: return llama.GGML_TYPE_Q4_1
+        }
+    }
+}
+
 func initializeLlamaCppBackend() {
     llama_backend_init()
 }
@@ -182,7 +202,14 @@ actor LlamaContext: Sendable {
     }
 
     // asynchronously load a model and create a LlamaContext
-    static func createContext(path: String, offloadCount: Int32, contextLength: UInt32, samplerSettings: SamplerSettings) async throws -> LlamaContext {
+    static func createContext(
+        path: String,
+        offloadCount: Int32,
+        contextLength: UInt32,
+        samplerSettings: SamplerSettings,
+        kvCacheType: KVCacheType = .f16)
+    async throws -> LlamaContext {
+        let cacheType = kvCacheType.ggmlType
         let initTask = Task.detached {
             return try autoreleasepool {
                 var model_params = llama_model_default_params()
@@ -208,6 +235,8 @@ actor LlamaContext: Sendable {
                 ctx_params.n_batch = 512
                 ctx_params.n_threads       = Int32(maxThreads)
                 ctx_params.n_threads_batch = Int32(maxThreads)
+                ctx_params.type_k = cacheType
+                ctx_params.type_v = cacheType
                 
                 guard let ctx = llama_init_from_model(model, ctx_params) else {
                     throw LlamaError.contextInitFailed

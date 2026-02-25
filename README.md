@@ -27,6 +27,7 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 
 
 ### Recent changes (newer to older):
+* KV cache quantization now supported and settings can be found in the 'Advanced' group of the Model config tab.
 * Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
   [kokoro-ios](https://github.com/mlalma/kokoro-ios) library. This uses an embedded 
   [MisakiSwift](https://github.com/mlalma/MisakiSwift) Grapheme-to-Phoneme engine and should be 

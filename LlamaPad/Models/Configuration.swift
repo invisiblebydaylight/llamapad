@@ -20,14 +20,26 @@ class AppConfiguration: ObservableObject, Codable {
     @Published var reservedContextBuffer: Int = 1024
     @Published var contextRunway: Int = 512
     @Published var layerCountToOffload: Int = 99
+    @Published var kvCacheType: KVCacheType = .f16
     @Published var customSampler: SamplerSettings = SamplerSettings()
     @Published var tts: TTSConfiguration = TTSConfiguration()
 
     enum CodingKeys: String, CodingKey {
-        case modelPath, modelBookmark, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, customSampler, tts
+        case modelPath, modelBookmark, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
     }
 
     init() {}
+    
+    /// returns a Bool indicating whether or not the `other` AppConfiguration settings require
+    /// a model reload in order to be effective.
+    func requiresReload(comparedTo other: AppConfiguration?) -> Bool {
+        guard let other = other else { return true }
+        
+        return self.modelPath != other.modelPath ||
+               self.contextLength != other.contextLength ||
+               self.layerCountToOffload != other.layerCountToOffload ||
+               self.kvCacheType != other.kvCacheType
+    }
 
     required convenience init(from decoder: Decoder) throws {
         self.init()
@@ -41,6 +53,7 @@ class AppConfiguration: ObservableObject, Codable {
         contextRunway = try container.decode(Int.self, forKey: .contextRunway)
         reservedContextBuffer = try container.decodeIfPresent(Int.self, forKey: .reservedContextBuffer) ?? 1024
         layerCountToOffload = try container.decode(Int.self, forKey: .layerCountToOffload)
+        kvCacheType = try container.decodeIfPresent(KVCacheType.self, forKey: .kvCacheType) ?? .f16
         customSampler = try container.decode(SamplerSettings.self, forKey: .customSampler)
         tts = try container.decode(TTSConfiguration.self, forKey: .tts)
     }
@@ -56,6 +69,7 @@ class AppConfiguration: ObservableObject, Codable {
         self.contextRunway = other.contextRunway
         self.reservedContextBuffer = other.reservedContextBuffer
         self.layerCountToOffload = other.layerCountToOffload
+        self.kvCacheType = other.kvCacheType
         self.customSampler = other.customSampler
         self.tts = other.tts
     }
@@ -71,6 +85,7 @@ class AppConfiguration: ObservableObject, Codable {
         try container.encode(contextRunway, forKey: .contextRunway)
         try container.encode(reservedContextBuffer, forKey: .reservedContextBuffer)
         try container.encode(layerCountToOffload, forKey: .layerCountToOffload)
+        try container.encode(kvCacheType, forKey: .kvCacheType)
         try container.encode(customSampler, forKey: .customSampler)
         try container.encode(tts, forKey: .tts)
     }

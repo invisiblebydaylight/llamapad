@@ -297,7 +297,8 @@ class AppState: ObservableObject {
                 path: modelURL.path,
                 offloadCount: Int32(config.layerCountToOffload),
                 contextLength: UInt32(config.contextLength),
-                samplerSettings: config.customSampler)
+                samplerSettings: config.customSampler,
+                kvCacheType: config.kvCacheType)
             print("Info: Model loading complete.\n")
         } catch {
             reportError("Error: failed to load model file \(modelURL.path()): \(error.localizedDescription)")
