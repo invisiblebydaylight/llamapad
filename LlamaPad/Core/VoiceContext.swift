@@ -24,6 +24,7 @@ class VoiceContext: ObservableObject {
     @Published var isPlaying = false
     @Published var isReady = false
     @Published var lastError: String?
+    @Published var interruptRequested  = false
 
     /// this tracks the currently played message, if the data is provided
     @Published var speakingMessageID: UUID?
@@ -76,6 +77,7 @@ class VoiceContext: ObservableObject {
         
         isReady = false
         isLoadingModel = true
+        interruptRequested = false
         defer {
             isLoadingModel = false
         }
@@ -128,8 +130,10 @@ class VoiceContext: ObservableObject {
     // does the TTS transformation of the supplied text String and then
     // plays the audio out.
     func speak(text: String, config: TTSConfiguration, messageId: UUID?, lang: Language = .enUS) async throws {
+        // tag this particular messageId as the one we're speaking, if supplied with the UUID
         speakingMessageID = messageId
-        
+        defer { speakingMessageID = nil }
+
         // if we haven't loaded the model yet, give that a shot
         if !isLoaded {
             try await load(from: config)
@@ -141,20 +145,48 @@ class VoiceContext: ObservableObject {
             throw VoiceError.noVoiceTensor
         }
         
-        // too heavy of a compute for the main actor...
-        let audio = try await Task.detached(priority: .userInitiated) {
-            let (audio, _) = try tts.generateAudio(
-                voice: voiceEmbedding,
-                language: lang,
-                text: text
-            )
-            return audio
-        }.value
+        // break the text string into 'paragraphs' by splitting at newlines and trimming
+        let paragraphs = text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
         
-        try playBuffer(audio)
+        // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
+        interruptRequested = false
+        for (i, paragraph) in paragraphs.enumerated() {
+            if interruptRequested { break }
+
+            // too heavy of a compute for the main actor...
+            let audio = try await Task.detached(priority: .utility) {
+                try tts.generateAudio(
+                    voice: voiceEmbedding,
+                    language: lang,
+                    text: paragraph
+                ).0
+            }.value
+
+            // wait for the playback to finish before starting the next paragraph
+            // but only if it's not the first time through the loop
+            if i > 0 {
+                while isPlaying && !interruptRequested {
+                    try await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+            
+            if interruptRequested { break }
+
+            speakingMessageID = messageId
+            try playBuffer(audio)
+        }
+        
+        // final delay to wait until the last message is finished playing
+        while isPlaying && !interruptRequested {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
     }
     
     private func playBuffer(_ audio: [Float]) throws {
+        isPlaying = true
+
         let audioFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 24000,
@@ -187,11 +219,9 @@ class VoiceContext: ObservableObject {
             guard let self = self else { return }
             Task { @MainActor in
                 self.isPlaying = false
-                self.speakingMessageID = nil
             }
         })
 
-        isPlaying = true
         playerNode.play()
         
         //print("DEBUG: audio Length: " + String(format: "%.4f", Double(audio.count) / 24000))
@@ -200,6 +230,7 @@ class VoiceContext: ObservableObject {
     func stopPlaying() {
         playerNode.stop()
         audioEngine.stop()
+        interruptRequested = true
         isPlaying = false
         speakingMessageID = nil
     }
@@ -210,6 +241,7 @@ class VoiceContext: ObservableObject {
         currentVoice = nil
         isReady = false
         isPlaying = false
+        interruptRequested = true
         speakingMessageID = nil
         
         // release the sandbox hold on the files

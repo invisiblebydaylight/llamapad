@@ -355,17 +355,12 @@ struct MessageView: View {
             }
             #endif
         }
-        .onChange(of: voiceContext.isPlaying) { _, isPlaying in
-            // track the play state when the speak button is armed
-            // and when it's finished playing audio, clear the arming state
-            if !isPlaying && armedButton == .Speak {
-                armedButton = .None
-            }
-        }
         .onChange(of: voiceContext.speakingMessageID) { _, speakingID in
             if speakingID == message.id {
                 armedButton = .Speak
-            } 
+            } else if armedButton == .Speak {
+                armedButton = .None
+            }
         }
 
     }
