@@ -359,7 +359,11 @@ struct MessageView: View {
             if speakingID == message.id {
                 armedButton = .Speak
             } else if armedButton == .Speak {
-                armedButton = .None
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    armedButton = .None
+                    showTray = false
+                }
+
             }
         }
 

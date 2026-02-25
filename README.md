@@ -62,6 +62,10 @@ and runs on the target device.
 ## Known Limitations
 
 * Currently doesn't support loading BF16 GGUF files. See 'Implementation Notes' for more details.
+* Using quantized KV cache instead of F16 may cause problems with flash attention on some models.
+* If you want to get wild and crazy with your Mac and increase the amount of memory usable
+  by metal, you can run a command like this (which sets the limit to 20GB):
+  `sudo sysctl iogpu.wired_limit_mb=20480`
 
 
 ## Future Goals

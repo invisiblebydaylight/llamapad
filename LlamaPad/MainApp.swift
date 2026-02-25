@@ -1,4 +1,5 @@
 import SwiftUI
+import MLX
 
 @main
 struct MainApp: App {
@@ -8,6 +9,10 @@ struct MainApp: App {
     @ApplicationDelegateAdaptor(LlamaPadAppDelegate.self) var appDelegate
 
     init() {
+        // put a leash on the MLX cache as it has a tendency
+        // to run wild and allow the app to OOM and crash.
+        GPU.set(cacheLimit: 100 * 1024 * 1024)
+        
         // NOTE: this disables bfloat16 to avoid the Metal 4 / M5 compiler crash
         // See also:
         // https://github.com/mybigday/llama.rn/issues/263

@@ -157,11 +157,17 @@ class VoiceContext: ObservableObject {
 
             // too heavy of a compute for the main actor...
             let audio = try await Task.detached(priority: .utility) {
-                try tts.generateAudio(
+                let result = try tts.generateAudio(
                     voice: voiceEmbedding,
                     language: lang,
                     text: paragraph
                 ).0
+                
+                // without clearing the cache, it would appear that memory stacks up
+                // until it will cause crashes on iOS.
+                MLX.GPU.clearCache()
+                
+                return result
             }.value
 
             // wait for the playback to finish before starting the next paragraph
