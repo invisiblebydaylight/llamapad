@@ -85,6 +85,7 @@ struct ContentView: View {
             .sheet(isPresented: $showingConfiguration) {
                 ConfigurationView(appState: appState)
                     .frame(minWidth: 400, minHeight: 600)
+                    .interactiveDismissDisabled()
             }
             .onAppear {
                 // show the config sheet if we don't have a model config loaded

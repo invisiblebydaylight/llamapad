@@ -1,7 +1,16 @@
 import Combine
 import SwiftUI
 
-class ModelConfiguration: ObservableObject, Codable {
+struct TTSConfiguration: Codable {
+    var isEnabled: Bool = false
+    var modelPath: String = ""
+    var modelBookmark: Data? = nil
+    var voicePath: String = ""
+    var voiceBookmark: Data? = nil
+    var autoPlayEnabled: Bool = false
+}
+
+class AppConfiguration: ObservableObject, Codable {
     @Published var modelPath: String = ""
     @Published var modelBookmark: Data? = nil
     @Published var chatTemplate: String? = nil
@@ -12,9 +21,10 @@ class ModelConfiguration: ObservableObject, Codable {
     @Published var contextRunway: Int = 512
     @Published var layerCountToOffload: Int = 99
     @Published var customSampler: SamplerSettings = SamplerSettings()
+    @Published var tts: TTSConfiguration = TTSConfiguration()
 
     enum CodingKeys: String, CodingKey {
-        case modelPath, modelBookmark, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, customSampler
+        case modelPath, modelBookmark, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, customSampler, tts
     }
 
     init() {}
@@ -32,10 +42,11 @@ class ModelConfiguration: ObservableObject, Codable {
         reservedContextBuffer = try container.decodeIfPresent(Int.self, forKey: .reservedContextBuffer) ?? 1024
         layerCountToOffload = try container.decode(Int.self, forKey: .layerCountToOffload)
         customSampler = try container.decode(SamplerSettings.self, forKey: .customSampler)
+        tts = try container.decode(TTSConfiguration.self, forKey: .tts)
     }
     
     // deep copy initializer
-    init(_ other: ModelConfiguration) {
+    init(_ other: AppConfiguration) {
         self.modelPath = other.modelPath
         self.modelBookmark = other.modelBookmark
         self.chatTemplate = other.chatTemplate
@@ -46,6 +57,7 @@ class ModelConfiguration: ObservableObject, Codable {
         self.reservedContextBuffer = other.reservedContextBuffer
         self.layerCountToOffload = other.layerCountToOffload
         self.customSampler = other.customSampler
+        self.tts = other.tts
     }
     
     func encode(to encoder: Encoder) throws {
@@ -60,6 +72,7 @@ class ModelConfiguration: ObservableObject, Codable {
         try container.encode(reservedContextBuffer, forKey: .reservedContextBuffer)
         try container.encode(layerCountToOffload, forKey: .layerCountToOffload)
         try container.encode(customSampler, forKey: .customSampler)
+        try container.encode(tts, forKey: .tts)
     }
 }
 

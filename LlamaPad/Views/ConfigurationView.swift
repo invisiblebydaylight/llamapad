@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ConfigurationView: View {
     @ObservedObject var appState: AppState
+    @EnvironmentObject var voiceContrext: VoiceContext
     @Environment(\.dismiss) private var dismiss
     
     @State private var isSysMsgExpanded = false
@@ -13,7 +14,7 @@ struct ConfigurationView: View {
     @State private var errorMessage = ""
     
     /// draft configuration - all edits happen here
-    @StateObject private var draftConfig: ModelConfiguration
+    @StateObject private var draftConfig: AppConfiguration
     
     /// the proxy of the real system message value for this View;
     /// must be synced to the real system message if settings are saved.
@@ -25,8 +26,8 @@ struct ConfigurationView: View {
     init(appState: AppState) {
         self.appState = appState
         
-        let baseConfig = appState.modelConfig ?? ModelConfiguration()
-        _draftConfig = StateObject(wrappedValue: ModelConfiguration(baseConfig))
+        let baseConfig = appState.modelConfig ?? AppConfiguration()
+        _draftConfig = StateObject(wrappedValue: AppConfiguration(baseConfig))
         
         // make sure the state of the system message is setup appropriately
         var initialSystemMessage = ""
@@ -50,6 +51,7 @@ struct ConfigurationView: View {
     }
 
     var body: some View {
+        NavigationStack {
             TabView {
                 ModelConfigTab(appState: appState, draftConfig: draftConfig, showingFilePicker: $showingFilePicker).tabItem {
                     Label("Model", systemImage: "cpu")
@@ -57,6 +59,10 @@ struct ConfigurationView: View {
                 
                 SystemMessageConfigTab(appState: appState, systemMessage: $localSystemMessage, tokenCount: $systemMessageTokenCount).tabItem {
                     Label("System", systemImage: "text.badge.plus")
+                }
+                
+                TTSConfigTab(appState: appState, draftConfig: draftConfig, showingError: $showingError, errorMessage: $errorMessage).tabItem {
+                    Label("Voice", systemImage: "speaker.wave.3")
                 }
             }
             .tabViewStyle(.automatic)
@@ -86,32 +92,44 @@ struct ConfigurationView: View {
                     .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }
             }
-        .fileImporter(
-            isPresented: $showingFilePicker,
-            allowedContentTypes: [UTType(importedAs: "com.invisiblebydaylight.llamapad.gguf")],
-            allowsMultipleSelection: false
-        ) { result in
-            handleModelSelect(result)
-        }
-        .alert("Configuration Error", isPresented: $showingError) {
-            Button("OK") {}
-        } message: {
-            Text(errorMessage)
+            .fileImporter(
+                isPresented: $showingFilePicker,
+                allowedContentTypes: [UTType(importedAs: "com.invisiblebydaylight.llamapad.gguf")],
+                allowsMultipleSelection: false
+            ) { result in
+                handleModelSelect(result)
+            }
+            .alert("Configuration Error", isPresented: $showingError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
     
     private func saveConfiguration() {
         Task {
-            let isReloadNeeded = needsReload
-            appState.modelConfig = ModelConfiguration(draftConfig)
+            let isModelReloadNeeded = needsReload
+            let isVoiceReloadNeeded = appState.modelConfig == nil ||
+                (draftConfig.tts.modelPath != appState.modelConfig!.tts.modelPath) ||
+                (draftConfig.tts.voicePath != appState.modelConfig!.tts.voicePath)
+            
+            appState.modelConfig = AppConfiguration(draftConfig)
             do {
                 // save out the configuration and if one of the settings that requires
                 // reloading was changed, then we reload the model here as well.
                 try PersistenceService.saveConfiguration(draftConfig)
-                if isReloadNeeded {
+                if isModelReloadNeeded {
                     await appState.reloadModel()
                 } else {
                     await appState.calculatePromptTokenCount()
+                }
+                
+                if appState.modelConfig!.tts.isEnabled == false {
+                    voiceContrext.unload()
+                }
+                if isVoiceReloadNeeded {
+                    try await voiceContrext.load(from: appState.modelConfig!.tts)
                 }
                 
                 // sync our proxied system message String back to the conversation

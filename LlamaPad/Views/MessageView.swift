@@ -62,6 +62,7 @@ enum ArmedButton {
     case Delete
     case Cancel
     case Commit
+    case Speak
 }
 
 /// this extention just factors out some styling options for the sidecar tray buttons.
@@ -89,6 +90,9 @@ extension View {
 struct MessageView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var message: Message
+    
+    /// used to provice text-to-speech features
+    @EnvironmentObject var voiceContext: VoiceContext
     
     /// whether or not the thinking view is expanded and visible
     @State private var isThinkingExpanded: Bool
@@ -119,83 +123,118 @@ struct MessageView: View {
     }
 
     private var SidecarTray: some View {
-        HStack(spacing: 8) {
-            if isEditing {
-                // These are the CANCEL and COMMIT buttons shown when editing
-                Button(action: {
-                    isEditing = false
-                    showTray = false
-                    armedButton = .None
-                }) {
-                    Image(systemName: "xmark")
-                        .sidecarTrayButtonStyle(background: .gray, armed: armedButton == .Cancel, showTray: showTray)
-                        .help("Cancel")
-                }
-                .buttonStyle(.plain)
-
-                Button(action: {
-                    commitEditButtonAction()
-                    isEditing = false
-                    showTray = false
-                    armedButton = .None
-                }) {
-                    Image(systemName: "checkmark")
-                        .sidecarTrayButtonStyle(background: .green, armed: armedButton == .Commit, showTray: showTray)
-                        .help("Save Edit")
-                }
-                .buttonStyle(.plain)
-            }
-            else {
-                // These are the REGEN, EDIT, DELETE buttons shown when not editing
-                if message.sender == .ai {
-                    // only ai messages get the regenerate option...
+        VStack {
+            HStack(spacing: 8) {
+                if isEditing {
+                    // These are the CANCEL and COMMIT buttons shown when editing
                     Button(action: {
-                        if armedButton == .Regenerate {
-                            regenerateButtonAction()
-                            armedButton = .None
-                            showTray = false
-                        } else {
-                            armedButton = .Regenerate
-                        }
+                        isEditing = false
+                        showTray = false
+                        armedButton = .None
                     }) {
-                        Image(systemName: "arrow.clockwise")
-                            .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
-                            .help("Regenerate")
+                        Image(systemName: "xmark")
+                            .sidecarTrayButtonStyle(background: .gray, armed: armedButton == .Cancel, showTray: showTray)
+                            .help("Cancel")
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        commitEditButtonAction()
+                        isEditing = false
+                        showTray = false
+                        armedButton = .None
+                    }) {
+                        Image(systemName: "checkmark")
+                            .sidecarTrayButtonStyle(background: .green, armed: armedButton == .Commit, showTray: showTray)
+                            .help("Save Edit")
                     }
                     .buttonStyle(.plain)
                 }
-                Button(action: {
-                    if armedButton == .Edit {
-                        editButtonAction()
-                        armedButton = .None
-                    } else {
-                        armedButton = .Edit
+                else {
+                    // These are the REGEN, EDIT, DELETE, SPEAK buttons shown when not editing
+                    if message.sender == .ai {
+                        // only ai messages get the regenerate option...
+                        Button(action: {
+                            if armedButton == .Regenerate {
+                                regenerateButtonAction()
+                                armedButton = .None
+                                showTray = false
+                            } else {
+                                armedButton = .Regenerate
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Regenerate, showTray: showTray)
+                                .help("Regenerate")
+                        }
+                        .buttonStyle(.plain)
                     }
-                }) {
-                    Image(systemName: "pencil")
-                        .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Edit, showTray: showTray)
-                        .help("Edit")
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    if armedButton == .Delete {
-                        deleteButtonAction()
-                        armedButton = .None
-                        showTray = false
-                    } else {
-                        armedButton = .Delete
+                    Button(action: {
+                        if armedButton == .Edit {
+                            editButtonAction()
+                            armedButton = .None
+                        } else {
+                            armedButton = .Edit
+                        }
+                    }) {
+                        Image(systemName: "pencil")
+                            .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Edit, showTray: showTray)
+                            .help("Edit")
                     }
-                }) {
-                    Image(systemName: "trash")
-                        .sidecarTrayButtonStyle(background: .red, armed: armedButton == .Delete, showTray: showTray)
-                        .help("Delete")
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        if armedButton == .Delete {
+                            deleteButtonAction()
+                            armedButton = .None
+                            showTray = false
+                        } else {
+                            armedButton = .Delete
+                        }
+                    }) {
+                        Image(systemName: "trash")
+                            .sidecarTrayButtonStyle(background: .red, armed: armedButton == .Delete, showTray: showTray)
+                            .help("Delete")
+                    }
+                    .buttonStyle(.plain)
+                    
+                    if message.sender == .ai && appState.modelConfig?.tts.isEnabled ?? false {
+                        Button(action: {
+                            Task {
+                                guard appState.modelConfig != nil else { return }
+                                
+                                // if audio is already playing, then the button press stops it.
+                                // if audio was not playing, then the app attempts to 'speak' the message content,
+                                // and arms the button.
+                                if voiceContext.isPlaying {
+                                    voiceContext.stopPlaying()
+                                    armedButton = .None
+                                } else {
+                                    do {
+                                        if armedButton != .Speak {
+                                            armedButton = .Speak
+                                            try await voiceContext.speak(
+                                                text: message.parsedContent.responseContent,
+                                                config: appState.modelConfig!.tts,
+                                                messageId: message.id)
+                                        }
+                                    } catch {
+                                        appState.reportError("Voice synthesis failed: \(error.localizedDescription)")
+                                    }
+                                }
+                            }
+                        }) {
+                            Image(systemName: "speaker.wave.3")
+                                .sidecarTrayButtonStyle(background: .blue, armed: armedButton == .Speak, showTray: showTray)
+                                .help("Speak")
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
             }
+            .opacity(showTray ? 1.0 : 0.0)
+            .animation(.easeInOut(duration: 0.2), value: showTray)
         }
-        .opacity(showTray ? 1.0 : 0.0)
-        .animation(.easeInOut(duration: 0.2), value: showTray)
     }
     
     private var MessageBubbleContent: some View {
@@ -286,7 +325,7 @@ struct MessageView: View {
             .padding(.vertical, 8)
             .contentShape(Rectangle())
             .onChange(of: showTray) { _, shown in
-                if !shown {
+                if !shown && armedButton != .Speak {
                     withAnimation {
                         armedButton = .None
                     }
@@ -316,6 +355,14 @@ struct MessageView: View {
             }
             #endif
         }
+        .onChange(of: voiceContext.speakingMessageID) { _, speakingID in
+            if speakingID == message.id {
+                armedButton = .Speak
+            } else if armedButton == .Speak {
+                armedButton = .None
+            }
+        }
+
     }
     
     private func regenerateButtonAction() {
