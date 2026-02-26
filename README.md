@@ -98,6 +98,10 @@ keep a simple focus on just providing AI chatting functionality.
 ## Dev Dependencies
 * [llama.cpp](https://github.com/ggml-org/llama.cpp/) is used as the primary AI inference engine.
 * [swift-jinja](https://github.com/huggingface/swift-jinja) is used as the embedded Jinja parser.
+* [MarkdownView](https://github.com/LiYanan2004/MarkdownView.git) to render chat as markdown.
+* [kokoro-ios](https://github.com/mlalma/kokoro-ios) is used for text-to-speech synthesis.
+* [mlx-swift](https://github.com/ml-explore/mlx-swift.git)) used primarily in TTS support at present.
+* [swift-safetensors](https://github.com/jkrukowski/swift-safetensors) to load `.safetensors` files.
 
 
 ## Implementation Notes
