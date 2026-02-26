@@ -6,8 +6,6 @@
     <true/>
     <key>UIFileSharingEnabled</key>
     <true/>
-    <key>UISupportsDocumentBrowser</key>
-    <true/>
 
     <key>UTImportedTypeDeclarations</key>
 	<array>
