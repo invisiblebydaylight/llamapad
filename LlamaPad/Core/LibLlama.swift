@@ -303,8 +303,14 @@ actor LlamaContext: Sendable {
         if commonPrefixCount < residentTokens.count {
             let mem = llama_get_memory(context)
             // seq_id 0, from position commonPrefixCount to infinity (-1)
-            _ = llama_memory_seq_rm(mem, 0, Int32(commonPrefixCount), -1)
-            residentTokens.removeSubrange(commonPrefixCount...)
+            if llama_memory_seq_rm(mem, 0, Int32(commonPrefixCount), -1) {
+                residentTokens.removeSubrange(commonPrefixCount...)
+            } else {
+                // partial removal failed, so nuke the whole thing
+                _ = llama_memory_seq_rm(mem, 0, 0, -1)
+                residentTokens.removeAll()
+                commonPrefixCount = 0
+            }
         }
             
         // now we only decode the new tokens from the prompt
