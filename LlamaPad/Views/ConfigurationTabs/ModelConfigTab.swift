@@ -9,8 +9,8 @@ struct ModelConfigTab: View {
     private let templateNames: [String] = getBuiltinTemplateNames()
     
     private var modelFilename: String {
-        guard !draftConfig.modelPath.isEmpty else { return "No model selected" }
-        return URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent
+        guard !draftConfig.modelPaths.isEmpty else { return "No model selected" }
+        return URL(fileURLWithPath: draftConfig.modelPaths.first!).lastPathComponent
     }
 
     var body: some View {
@@ -22,12 +22,12 @@ struct ModelConfigTab: View {
                         
                         Spacer()
                         
-                        if draftConfig.modelPath.isEmpty {
+                        if draftConfig.modelPaths.isEmpty {
                             Text("GGUF File Required...")
                                 .foregroundColor(Color(.systemRed))
                                 .italic()
                         } else {
-                            Text(URL(fileURLWithPath: draftConfig.modelPath).lastPathComponent)
+                            Text(URL(fileURLWithPath: draftConfig.modelPaths.first!).lastPathComponent)
                                 .foregroundColor(.primary)
                         }
                         

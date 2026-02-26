@@ -11,8 +11,8 @@ struct TTSConfiguration: Codable {
 }
 
 class AppConfiguration: ObservableObject, Codable {
-    @Published var modelPath: String = ""
-    @Published var modelBookmark: Data? = nil
+    @Published var modelPaths: [String] = []
+    @Published var modelBookmarks: [Data] = []
     @Published var chatTemplate: String? = nil
     @Published var enableThinking: Bool = true
     @Published var contextLength: Int = 4096
@@ -25,7 +25,7 @@ class AppConfiguration: ObservableObject, Codable {
     @Published var tts: TTSConfiguration = TTSConfiguration()
 
     enum CodingKeys: String, CodingKey {
-        case modelPath, modelBookmark, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
+        case modelPaths, modelBookmarks, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
     }
 
     init() {}
@@ -35,7 +35,7 @@ class AppConfiguration: ObservableObject, Codable {
     func requiresReload(comparedTo other: AppConfiguration?) -> Bool {
         guard let other = other else { return true }
         
-        return self.modelPath != other.modelPath ||
+        return self.modelPaths != other.modelPaths ||
                self.contextLength != other.contextLength ||
                self.layerCountToOffload != other.layerCountToOffload ||
                self.kvCacheType != other.kvCacheType
@@ -44,8 +44,8 @@ class AppConfiguration: ObservableObject, Codable {
     required convenience init(from decoder: Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        modelPath = try container.decode(String.self, forKey: .modelPath)
-        modelBookmark = try container.decodeIfPresent(Data.self, forKey: .modelBookmark)
+        modelPaths = try container.decode([String].self, forKey: .modelPaths)
+        modelBookmarks = try container.decode([Data].self, forKey: .modelBookmarks)
         chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
         enableThinking = try container.decodeIfPresent(Bool.self, forKey: .enableThinking) ?? true
         contextLength = try container.decode(Int.self, forKey: .contextLength)
@@ -60,8 +60,8 @@ class AppConfiguration: ObservableObject, Codable {
     
     // deep copy initializer
     init(_ other: AppConfiguration) {
-        self.modelPath = other.modelPath
-        self.modelBookmark = other.modelBookmark
+        self.modelPaths = other.modelPaths
+        self.modelBookmarks = other.modelBookmarks
         self.chatTemplate = other.chatTemplate
         self.enableThinking = other.enableThinking
         self.contextLength = other.contextLength
@@ -76,8 +76,8 @@ class AppConfiguration: ObservableObject, Codable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(modelPath, forKey: .modelPath)
-        try container.encode(modelBookmark, forKey: .modelBookmark)
+        try container.encode(modelPaths, forKey: .modelPaths)
+        try container.encode(modelBookmarks, forKey: .modelBookmarks)
         try container.encode(chatTemplate, forKey: .chatTemplate)
         try container.encode(enableThinking, forKey: .enableThinking)
         try container.encode(contextLength, forKey: .contextLength)

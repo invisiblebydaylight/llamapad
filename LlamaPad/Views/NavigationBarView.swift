@@ -29,7 +29,11 @@ struct NavigationBarView: View {
 
             Spacer()
             
-            if let path = appState.modelConfig?.modelPath, !path.isEmpty {
+            if let config = appState.modelConfig,
+               !config.modelPaths.isEmpty,
+               let path = config.modelPaths.first,
+               !path.isEmpty
+            {
                 let modelDisplayName = URL(fileURLWithPath: path).lastPathComponent
                 Text(modelDisplayName)
                     .font(.caption)

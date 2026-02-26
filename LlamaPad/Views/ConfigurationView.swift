@@ -76,15 +76,15 @@ struct ConfigurationView: View {
                             Text("Save Changes")
                         }
                     }
-                    .disabled(draftConfig.modelPath.isEmpty || appState.isBusy)
+                    .disabled(draftConfig.modelPaths.isEmpty || appState.isBusy)
                     .buttonStyle(.borderedProminent)
                     .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }
             }
             .fileImporter(
                 isPresented: $showingFilePicker,
-                allowedContentTypes: [UTType(importedAs: "com.invisiblebydaylight.llamapad.gguf")],
-                allowsMultipleSelection: false
+                allowedContentTypes: [UTType(filenameExtension: "gguf", conformingTo: .data) ?? .data],
+                allowsMultipleSelection: true
             ) { result in
                 handleModelSelect(result)
             }
@@ -140,26 +140,34 @@ struct ConfigurationView: View {
     private func handleModelSelect(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            let url = urls.first!
-            let gotAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if gotAccess { url.stopAccessingSecurityScopedResource() }
-            }
+            // Sort the URLs to ensure the first shard is actually the first in the list
+            let sortedUrls = urls.sorted { $0.path < $1.path }
+                    
 
-            do {
-                // generate our persistent bookmark
-                let bookmarkData = try url.bookmarkData(
-                    options: .minimalBookmark,
-                    includingResourceValuesForKeys: nil,
-                    relativeTo: nil
-                )
+            var modelBookmarks: [Data] = []
+            let modelPaths = urls.compactMap { url in url.path() }
+            for url in urls {
+                let gotAccess = url.startAccessingSecurityScopedResource()
+                defer {
+                    if gotAccess { url.stopAccessingSecurityScopedResource() }
+                }
                 
-                draftConfig.modelPath = url.path
-                draftConfig.modelBookmark = bookmarkData
-            } catch {
-                errorMessage = "Failed to create the bookmark for the model: \(error)"
-                showingError = true
+                do {
+                    // generate our persistent bookmark
+                    let bookmarkData = try url.bookmarkData(
+                        options: .minimalBookmark,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                    modelBookmarks.append(bookmarkData)
+                } catch {
+                    errorMessage = "Failed to create the bookmark for the model: \(error)"
+                    showingError = true
+                }
             }
+            draftConfig.modelPaths = modelPaths
+            draftConfig.modelBookmarks = modelBookmarks
+            
         case .failure(let error):
             errorMessage = "File picker error: \(error)"
             showingError = true

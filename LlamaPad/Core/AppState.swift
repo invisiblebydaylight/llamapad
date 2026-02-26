@@ -6,7 +6,7 @@ import SwiftUI
 class AppState: ObservableObject {
     /// this should be set to the URL used to load the model and used to
     /// track security access for it.
-    private var currentModelURL: URL?
+    private var currentModelURLs: [URL] = []
     
     @Published var modelConfig: AppConfiguration?
     
@@ -245,63 +245,51 @@ class AppState: ObservableObject {
             reportError("Error: No configuration available; hit that gear icon and setup the app.")
             return
         }
-        guard !config.modelPath.isEmpty else {
-            reportError("Error: No model path configured; make sure to setup the configuration.")
+        guard !config.modelPaths.isEmpty else {
+            reportError("Error: No model paths configured; make sure to setup the model in the configuration.")
             return
         }
-        
+        guard !config.modelBookmarks.isEmpty else {
+            reportError("Error: No model bookmark data; make sure to setup the model in the configuration.")
+            return
+        }
+
         isLoadingModel = true
         defer { isLoadingModel = false }
         
         // attempt to use the stored security scoped bookmark if one
         // was aquired for this model file when building the new
         // URL to access.
-        var modelURL: URL
-        if let bookmarkData = config.modelBookmark {
+        var activatedURLS: [URL] = []
+        for data in config.modelBookmarks {
             // Resolve the bookmark
             var isStale = false
-            do {
-                let options = URL.BookmarkResolutionOptions()
-                modelURL = try URL(resolvingBookmarkData: bookmarkData,
-                                   options: options,
-                                   relativeTo: nil,
-                                   bookmarkDataIsStale: &isStale)
-                
-                if isStale {
-                    // create a fresh bookmark from the resolved URL
-                    let freshBookmark = try modelURL.bookmarkData(
-                        options: .minimalBookmark,
-                        includingResourceValuesForKeys: nil,
-                        relativeTo: nil
-                    )
-                    config.modelBookmark = freshBookmark
-                    try PersistenceService.saveConfiguration(config)
-                    print("Info: Bookmark refreshed and saved successfully.")
+            if let url = try? URL(resolvingBookmarkData: data,
+                               options: URL.BookmarkResolutionOptions(),
+                               relativeTo: nil,
+                               bookmarkDataIsStale: &isStale)
+            {
+                if url.startAccessingSecurityScopedResource() {
+                    activatedURLS.append(url)
                 }
-                
-                if modelURL.startAccessingSecurityScopedResource() {
-                    currentModelURL = modelURL
-                }
-            } catch {
-                reportError("Resource access failed: \(error.localizedDescription)")
-                return
             }
-        } else {
-            modelURL = URL(fileURLWithPath: config.modelPath)
         }
         
+        self.currentModelURLs = activatedURLS
+        
         // do the actual model loading
-        print("Loading model: \(modelURL.path)\n")
+        let modelURL = config.modelPaths.first!
+        print("Loading model: \(modelURL)\n")
         do {
             llamaContext = try await LlamaContext.createContext(
-                path: modelURL.path,
+                path: modelURL,
                 offloadCount: Int32(config.layerCountToOffload),
                 contextLength: UInt32(config.contextLength),
                 samplerSettings: config.customSampler,
                 kvCacheType: config.kvCacheType)
             print("Info: Model loading complete.\n")
         } catch {
-            reportError("Error: failed to load model file \(modelURL.path()): \(error.localizedDescription)")
+            reportError("Error: failed to load model file \(modelURL): \(error.localizedDescription)")
         }
         
     }
@@ -310,8 +298,10 @@ class AppState: ObservableObject {
         await self.llamaContext?.unload()
         self.llamaContext = nil
         
-        currentModelURL?.stopAccessingSecurityScopedResource()
-        currentModelURL = nil
+        for url in currentModelURLs {
+            url.stopAccessingSecurityScopedResource()
+        }
+        currentModelURLs = []
         
         print("Info: Model unloaded and security scope released.")
     }

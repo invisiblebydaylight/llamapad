@@ -6,28 +6,5 @@
     <true/>
     <key>UIFileSharingEnabled</key>
     <true/>
-
-    <key>UTImportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.data</string>
-			</array>
-			<key>UTTypeDescription</key>
-			<string>GGUF Model File</string>
-			<key>UTTypeIcons</key>
-			<dict/>
-			<key>UTTypeIdentifier</key>
-			<string>com.invisiblebydaylight.llamapad.gguf</string>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>gguf</string>
-				</array>
-			</dict>
-		</dict>
-	</array>
 </dict>
 </plist>
