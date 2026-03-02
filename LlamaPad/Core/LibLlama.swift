@@ -9,6 +9,7 @@ import llama
 
 enum KVCacheType: String, Codable, CaseIterable {
     case f16 = "F16 (None)"
+    case bf16 = "BF16"
     case q8_0 = "Q8_0"
     case q5_0 = "Q5_0"
     case q5_1 = "Q5_1"
@@ -18,6 +19,7 @@ enum KVCacheType: String, Codable, CaseIterable {
     nonisolated var ggmlType: llama.ggml_type {
         switch self {
         case .f16: return llama.GGML_TYPE_F16
+        case .bf16: return llama.GGML_TYPE_BF16
         case .q8_0: return llama.GGML_TYPE_Q8_0
         case .q5_0: return llama.GGML_TYPE_Q5_0
         case .q5_1: return llama.GGML_TYPE_Q5_1
