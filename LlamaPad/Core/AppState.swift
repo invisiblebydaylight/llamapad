@@ -265,7 +265,7 @@ class AppState: ObservableObject {
             // Resolve the bookmark
             var isStale = false
             if let url = try? URL(resolvingBookmarkData: data,
-                               options: URL.BookmarkResolutionOptions(),
+                                  options: .withSecurityScope,
                                relativeTo: nil,
                                bookmarkDataIsStale: &isStale)
             {
@@ -276,6 +276,10 @@ class AppState: ObservableObject {
         }
         
         self.currentModelURLs = activatedURLS
+        if currentModelURLs.isEmpty {
+            reportError("Error: Could not obtain the security scoped bookmark data needed to load the model.")
+            return
+        }
         
         // do the actual model loading
         let modelURL = config.modelPaths.first!

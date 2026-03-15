@@ -143,7 +143,6 @@ struct ConfigurationView: View {
             // Sort the URLs to ensure the first shard is actually the first in the list
             let sortedUrls = urls.sorted { $0.path < $1.path }
                     
-
             var modelBookmarks: [Data] = []
             let modelPaths = urls.compactMap { url in url.path() }
             for url in urls {
@@ -155,7 +154,7 @@ struct ConfigurationView: View {
                 do {
                     // generate our persistent bookmark
                     let bookmarkData = try url.bookmarkData(
-                        options: .minimalBookmark,
+                        options: .securityScopeAllowOnlyReadAccess,
                         includingResourceValuesForKeys: nil,
                         relativeTo: nil
                     )
