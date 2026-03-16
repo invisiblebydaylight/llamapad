@@ -106,7 +106,7 @@ struct TTSConfigTab: View {
             do {
                 // generate our persistent bookmark
                 let bookmarkData = try url.bookmarkData(
-                    options: .minimalBookmark,
+                    options: .securityScopeAllowOnlyReadAccess,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )

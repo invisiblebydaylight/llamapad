@@ -9,12 +9,14 @@ enum VoiceError: LocalizedError {
     case noVoiceTensor
     case notReady
     case bufferCreationFailed
+    case securityScopeFailed(String)
     
     var errorDescription: String? {
         switch self {
         case .noVoiceTensor: return "No voice tensor found in the voice file. Make sure the right safetensors file is provided."
         case .notReady: return "Voice context is not ready. Make sure to load the model and voice files first."
         case .bufferCreationFailed: return "Failed to create the audio buffer"
+        case .securityScopeFailed(let path): return "Failed to obtain security scope for: \(path)"
         }
     }
 }
@@ -70,10 +72,8 @@ class VoiceContext: ObservableObject {
     
     /// loads the kokoro model safetensors file and the selected kokoro voice safetensors file and throws
     /// an exception if something goes wrong.
-    func load(modelSafetensors: URL, voiceSafetensors: URL) async throws {
+    private func loadModelFiles(modelSafetensors: URL, voiceSafetensors: URL) async throws {
         guard !isLoadingModel else { return }
-        
-        unload()
         
         isReady = false
         isLoadingModel = true
@@ -100,26 +100,33 @@ class VoiceContext: ObservableObject {
         isReady = true
     }
     
+    // loads the kokoro model safetensors file and the selected voice safetensors file
+    // that is specified in the configuration object; throws an exception on error.
     func load(from config: TTSConfiguration) async throws {
         guard let modelURL = try resolve(config.modelBookmark, fallback: config.modelPath),
               let voiceURL = try resolve(config.voiceBookmark, fallback: config.voicePath) else {
             throw VoiceError.notReady
         }
-
-        if modelURL.startAccessingSecurityScopedResource() {
-            if voiceURL.startAccessingSecurityScopedResource() {
-                currentModelURL = modelURL
-                currentVoiceURL = voiceURL
-                try await self.load(modelSafetensors: modelURL, voiceSafetensors: voiceURL)
-            }
+        
+        unload()
+        
+        guard modelURL.startAccessingSecurityScopedResource() else {
+            throw VoiceError.securityScopeFailed(modelURL.path)
         }
+        
+        guard voiceURL.startAccessingSecurityScopedResource() else {
+            throw VoiceError.securityScopeFailed(voiceURL.path)
+        }
+        currentModelURL = modelURL
+        currentVoiceURL = voiceURL
+        try await self.loadModelFiles(modelSafetensors: modelURL, voiceSafetensors: voiceURL)
     }
     
     private func resolve(_ data: Data?, fallback: String) throws -> URL? {
         if let data = data {
             var isStale = false
             let url = try URL(resolvingBookmarkData: data,
-                              options: URL.BookmarkResolutionOptions(),
+                              options: .withSecurityScope,
                               relativeTo: nil,
                               bookmarkDataIsStale: &isStale)
             return url
