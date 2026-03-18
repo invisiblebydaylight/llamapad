@@ -264,11 +264,19 @@ class AppState: ObservableObject {
         for data in config.modelBookmarks {
             // Resolve the bookmark
             var isStale = false
-            if let url = try? URL(resolvingBookmarkData: data,
-                                  options: .withSecurityScope,
+            
+            #if os(macOS)
+            let url = try? URL(resolvingBookmarkData: data,
+                               options: .withSecurityScope,
                                relativeTo: nil,
                                bookmarkDataIsStale: &isStale)
-            {
+            #else
+            let url = try? URL(resolvingBookmarkData: data,
+                               options: [],
+                               relativeTo: nil,
+                               bookmarkDataIsStale: &isStale)
+            #endif
+            if let url = url {
                 if url.startAccessingSecurityScopedResource() {
                     activatedURLS.append(url)
                 }

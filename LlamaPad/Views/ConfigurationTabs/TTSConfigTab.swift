@@ -105,11 +105,19 @@ struct TTSConfigTab: View {
 
             do {
                 // generate our persistent bookmark
+                #if os(macOS)
                 let bookmarkData = try url.bookmarkData(
                     options: .securityScopeAllowOnlyReadAccess,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
+                #else
+                let bookmarkData = try url.bookmarkData(
+                    options: .minimalBookmark,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+                #endif
                 
                 switch pickerTarget {
                 case .model:

@@ -144,7 +144,7 @@ struct ConfigurationView: View {
             let sortedUrls = urls.sorted { $0.path < $1.path }
                     
             var modelBookmarks: [Data] = []
-            let modelPaths = urls.compactMap { url in url.path() }
+            let modelPaths = sortedUrls.compactMap { url in url.path() }
             for url in urls {
                 let gotAccess = url.startAccessingSecurityScopedResource()
                 defer {
@@ -153,11 +153,19 @@ struct ConfigurationView: View {
                 
                 do {
                     // generate our persistent bookmark
+                    #if os(macOS)
                     let bookmarkData = try url.bookmarkData(
                         options: .securityScopeAllowOnlyReadAccess,
                         includingResourceValuesForKeys: nil,
                         relativeTo: nil
                     )
+                    #else
+                    let bookmarkData = try url.bookmarkData(
+                        options: .minimalBookmark,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                    #endif
                     modelBookmarks.append(bookmarkData)
                 } catch {
                     errorMessage = "Failed to create the bookmark for the model: \(error)"

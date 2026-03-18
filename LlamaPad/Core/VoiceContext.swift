@@ -125,10 +125,17 @@ class VoiceContext: ObservableObject {
     private func resolve(_ data: Data?, fallback: String) throws -> URL? {
         if let data = data {
             var isStale = false
+            #if os(macOS)
             let url = try URL(resolvingBookmarkData: data,
                               options: .withSecurityScope,
                               relativeTo: nil,
                               bookmarkDataIsStale: &isStale)
+            #else
+            let url = try URL(resolvingBookmarkData: data,
+                              options: [],
+                              relativeTo: nil,
+                              bookmarkDataIsStale: &isStale)
+            #endif
             return url
         }
         return fallback.isEmpty ? nil : URL(fileURLWithPath: fallback)

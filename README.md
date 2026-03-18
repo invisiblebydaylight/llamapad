@@ -62,12 +62,12 @@ and runs on the target device.
 ## Known Limitations
 
 * Using quantized KV cache instead of F16 may cause problems with flash attention on some models.
-* Sometimes after a hard crash and reboot, you may need to go through the configuration options
-  and browse to the files again.
 * If you want to get wild and crazy with your Mac and increase the amount of memory usable
   by metal, you can run a command like this (which sets the limit to 20GB):
   `sudo sysctl iogpu.wired_limit_mb=20480`
-
+* If you're really pushing the memory limit of your device with the LLM, it's possible that
+  you'll get errors when trying to use TTS and the error message will have a coreaudio exception.
+  
 
 ## Future Goals
 
