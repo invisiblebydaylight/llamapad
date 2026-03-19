@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 struct ConfigurationView: View {
     @ObservedObject var appState: AppState
-    @EnvironmentObject var voiceContrext: VoiceContext
+    @EnvironmentObject var voiceContext: VoiceContext
     @Environment(\.dismiss) private var dismiss
     
     @State private var isSysMsgExpanded = false
@@ -115,10 +115,10 @@ struct ConfigurationView: View {
                 }
                 
                 if appState.modelConfig!.tts.isEnabled == false {
-                    voiceContrext.unload()
+                    voiceContext.unload()
                 }
                 if isVoiceReloadNeeded {
-                    try await voiceContrext.load(from: appState.modelConfig!.tts)
+                    try await voiceContext.load(from: appState.modelConfig!.tts)
                 }
                 
                 // sync our proxied system message String back to the conversation
