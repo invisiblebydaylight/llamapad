@@ -201,6 +201,7 @@ actor LlamaContext: Sendable {
         if model != nil {
             llama_model_free(model)
         }
+        llama_backend_free()
     }
 
     // asynchronously load a model and create a LlamaContext
@@ -217,7 +218,10 @@ actor LlamaContext: Sendable {
                 var model_params = llama_model_default_params()
                 model_params.n_gpu_layers = offloadCount
                 
-                // turning this off for better memory management
+                // turning MMAP off for better memory management in general.
+                // when pushing memory limits on macOS, this prevents audio
+                // from getting killed and on iOS this helps prevent hardware
+                // reboots from model swaps.
                 model_params.use_mmap = false
                 
 #if targetEnvironment(simulator)

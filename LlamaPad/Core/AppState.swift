@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import MLX
 
 @MainActor
 class AppState: ObservableObject {
@@ -316,6 +317,11 @@ class AppState: ObservableObject {
         currentModelURLs = []
         
         print("Info: Model unloaded and security scope released.")
+        
+        // attempt to clear what we can and then sleep so that we don't
+        // crash when loading heavy models after unloading a heavy model.
+        MLX.GPU.clearCache()
+        sleep(1)
     }
     
     /// Explicitly persists the current message log to disk.
