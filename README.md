@@ -27,6 +27,9 @@ more esoteric sampler settings like DRY and XTC are available under the advanced
 
 
 ### Recent changes (newer to older):
+* Lazy-loading the model is now supported. LLMs no longer load automatically on application startup. A Load/Eject
+  button has been added next to the config button to manually control the behavior, otherwise the configured
+  model is loaded when the user sends a message, generates a response or regenerates an existing one.
 * KV cache quantization now supported and settings can be found in the 'Advanced' group of the Model config tab.
 * Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
   [kokoro-ios](https://github.com/mlalma/kokoro-ios) library. This uses an embedded 
@@ -67,6 +70,8 @@ and runs on the target device.
   `sudo sysctl iogpu.wired_limit_mb=20480`
 * If you're really pushing the memory limit of your device with the LLM, it's possible that
   you'll get errors when trying to use TTS and the error message will have a coreaudio exception.
+  There are currently no guard rails on what size models you can load; with great power
+  comes great responsibility.
   
 
 ## Future Goals

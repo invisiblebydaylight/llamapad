@@ -218,11 +218,8 @@ actor LlamaContext: Sendable {
                 var model_params = llama_model_default_params()
                 model_params.n_gpu_layers = offloadCount
                 
-                // turning MMAP off for better memory management in general.
-                // when pushing memory limits on macOS, this prevents audio
-                // from getting killed and on iOS this helps prevent hardware
-                // reboots from model swaps.
-                model_params.use_mmap = false
+                model_params.use_mmap = true
+                model_params.use_mlock = false
                 
 #if targetEnvironment(simulator)
                 // simulators don't support Metal

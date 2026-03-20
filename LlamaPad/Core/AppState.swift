@@ -65,11 +65,6 @@ class AppState: ObservableObject {
         // start off by loading the configuration file first, if it exists
         do {
             modelConfig = try PersistenceService.loadConfiguration()
-            if modelConfig != nil {
-                Task {
-                    await reloadModel()
-                }
-            }
         } catch PersistenceError.fileNotFound {
             // ignore this and don't report it; it'll freak out first time users
         }
@@ -315,13 +310,19 @@ class AppState: ObservableObject {
             url.stopAccessingSecurityScopedResource()
         }
         currentModelURLs = []
+
+        // by creating an array and immediately asking for a value,
+        // we force the CPU to wait for the GPU to finish all pending
+        // tasks (including the deallocations from llama.cpp).
+        //
+        // without this, memory that we free from deallocating the
+        // LLM *won't actually be released* and another load will
+        // potentially hard-lock or force a reboot of the device.
+        let syncArray = MLXArray(Array(0...10))
+        _ = syncArray.sum().item(Int.self)
+        await Task.yield()
         
         print("Info: Model unloaded and security scope released.")
-        
-        // attempt to clear what we can and then sleep so that we don't
-        // crash when loading heavy models after unloading a heavy model.
-        MLX.GPU.clearCache()
-        sleep(1)
     }
     
     /// Explicitly persists the current message log to disk.
@@ -408,8 +409,14 @@ class AppState: ObservableObject {
     
     // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse(isContinue: Bool = false) async {
+        // if we don't have a model loaded, then we do a reload right now
+        if llamaContext == nil {
+            await reloadModel()
+        }
+        
+        // ... and then make sure the loading actually worked.
         guard let llamaContext else {
-            reportError("Error: Model not loaded and it really should be at this point... Interesting.")
+            reportError("Error: Failed to load the language model. Double check your configuration.")
             return
         }
         

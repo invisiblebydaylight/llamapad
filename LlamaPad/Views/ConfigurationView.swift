@@ -109,7 +109,8 @@ struct ConfigurationView: View {
                 // reloading was changed, then we reload the model here as well.
                 try PersistenceService.saveConfiguration(draftConfig)
                 if isModelReloadNeeded {
-                    await appState.reloadModel()
+                    // here we unload and just let the user load back up when ready
+                    await appState.unloadModel()
                 } else {
                     await appState.calculatePromptTokenCount()
                 }

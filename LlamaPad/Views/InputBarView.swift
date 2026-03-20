@@ -79,9 +79,6 @@ struct InputBarView: View {
     }
 
     var body: some View {
-        let isReady = appState.llamaContext != nil &&
-            appState.modelConfig != nil &&
-            appState.isLoadingModel == false
         HStack {
             TextEditor(text: $inputText)
                 .padding(4)
@@ -98,7 +95,7 @@ struct InputBarView: View {
                 .onKeyPress(keys: [.return]) { press in
                     if press.modifiers.contains(.command) {
                         // don't send empty messages
-                        guard isReady && !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                             return .handled
                         }
 
@@ -144,7 +141,5 @@ struct InputBarView: View {
         }
         .padding()
         .buttonStyle(.borderless)
-        .disabled(!isReady)
-        .opacity(isReady ? 1.0 : 0.5)
     }
 }
