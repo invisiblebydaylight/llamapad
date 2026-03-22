@@ -11,10 +11,13 @@ struct NavigationBarView: View {
             Button(action: {
                 isShowingDeleteConfirmation = true
             }) {
-                Image(systemName: "trash")
-                    .font(.title2)
-                    .foregroundColor(.primary)
-                    .padding(4)
+                VStack(spacing: 2) {
+                    Image(systemName: "trash")
+                        .font(.title2)
+                        .foregroundColor(.primary)
+                        .padding(4)
+                    Text("Clear")
+                }
             }
             .disabled(appState.isBusy)
             .opacity(appState.isBusy ? 0.5 : 1.0)
@@ -29,7 +32,11 @@ struct NavigationBarView: View {
 
             Spacer()
             
-            if let path = appState.modelConfig?.modelPath, !path.isEmpty {
+            if let config = appState.modelConfig,
+               !config.modelPaths.isEmpty,
+               let path = config.modelPaths.first,
+               !path.isEmpty
+            {
                 let modelDisplayName = URL(fileURLWithPath: path).lastPathComponent
                 Text(modelDisplayName)
                     .font(.caption)
@@ -45,11 +52,37 @@ struct NavigationBarView: View {
             
             Spacer()
             
+            Button(action: {
+                // this button acts as a toggle and should load the model if not loaded
+                // and free it otherwise if it already is loaded.
+                if appState.llamaContext == nil {
+                    Task {
+                        await appState.reloadModel()
+                    }
+                } else {
+                    Task {
+                        await appState.unloadModel()
+                    }
+                }
+            }) {
+                VStack(spacing: 2){
+                    Image(systemName: appState.llamaContext != nil ? "eject" : "arrow.down.circle")
+                        .font(.title2)
+                        .foregroundColor(.primary)
+                        .padding(4)
+                    Text(appState.llamaContext != nil ? "Eject" : "Load")
+                }
+            }
+            .disabled(appState.isBusy)
+            
             Button(action: onSettingsTap) {
-                Image(systemName: "gearshape")
-                    .font(.title2)
-                    .foregroundColor(.primary)
-                    .padding(4)
+                VStack(spacing: 2) {
+                    Image(systemName: "gearshape")
+                        .font(.title2)
+                        .foregroundColor(.primary)
+                        .padding(4)
+                    Text("Config")
+                }
             }
         }
         .padding(.horizontal)

@@ -1,14 +1,21 @@
 import Foundation
 import Combine
 import SwiftUI
+import MLX
 
 @MainActor
 class AppState: ObservableObject {
     /// this should be set to the URL used to load the model and used to
     /// track security access for it.
-    private var currentModelURL: URL?
+    private var currentModelURLs: [URL] = []
     
-    @Published var modelConfig: ModelConfiguration?
+    @Published var modelConfig: AppConfiguration?
+    
+    /// the loaded conversations the app is tracking
+    @Published var conversations: [ConversationMetadata] = []
+    
+    /// if present, indicates that the conversation matching that id is 'selected' in the application
+    @Published var currentConversationID: UUID?
     
     /// main storage for all of the messages in the log
     @Published var messageLog: [Message] = []
@@ -40,9 +47,13 @@ class AppState: ObservableObject {
     
     /// used to track the processing status for the app (like prompt ingestion); 0.0..1.0 range.
     @Published var processingProgress: Double? = nil
-
+    
     /// describes the current processing task (e.g. "Processing Prompt...")
     @Published var processingStatus: String? = nil
+
+    /// a callback that gets called on completion, if supplied, with the new message that was generated.
+    /// this callback is skipped if the generation is cancled by the user with `shouldStopGenerating`
+    var onGenerationFinished: ((Message) -> Void)?
     
     /// returns `true` if the app is currently performing a long, heavy action
     /// like loading a model or generating a reply - something that should not be interrupted.
@@ -54,11 +65,6 @@ class AppState: ObservableObject {
         // start off by loading the configuration file first, if it exists
         do {
             modelConfig = try PersistenceService.loadConfiguration()
-            if modelConfig != nil {
-                Task {
-                    await reloadModel()
-                }
-            }
         } catch PersistenceError.fileNotFound {
             // ignore this and don't report it; it'll freak out first time users
         }
@@ -66,13 +72,19 @@ class AppState: ObservableObject {
             reportError("Configuration error: \(error.localizedDescription)")
         }
         
-        // next, try to load the chatlog file, if it exists
+        // next we refresh the conversation list and select the last one as activated
         do {
-            messageLog = try PersistenceService.loadChatLog()
-        } catch PersistenceError.fileNotFound {
-            // ignore this and don't report it; it'll freak out first time users
+            conversations = try ConversationService.listConversations()
+            if let lastConvo = conversations.first {
+                selectConversation(lastConvo.id)
+            } else {
+                let newConvo = try ConversationService.createConversation(title: "Untitled")
+                conversations.append(newConvo)
+                currentConversationID = newConvo.id
+                selectConversation(newConvo.id)
+            }
         } catch {
-            reportError("Chatlog error: \(error.localizedDescription)")
+            reportError("Conversations error: \(error.localizedDescription)")
         }
     }
     
@@ -123,6 +135,91 @@ class AppState: ObservableObject {
         }
     }
     
+    func selectConversation(_ id: UUID?) {
+        self.currentConversationID = id
+        self.contextAnchorID = nil
+        self.messageLog = []
+        
+        // load the new conversation's chat log
+        if let id = id {
+            do {
+                let newLog = try ConversationService.loadChatLog(for: id)
+                self.messageLog = newLog
+                Task {
+                    await self.calculatePromptTokenCount()
+                }
+            } catch {
+                self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// duplicates the conversation and then inserts it into the runtime `conversations` list
+    func duplicateConversation(for id: UUID) throws -> ConversationMetadata? {
+        do {
+            let dupe = try ConversationService.duplicateConversation(id: id)
+            conversations.insert(dupe, at: 0)
+            currentConversationID = dupe.id
+            return dupe
+        } catch {
+            reportError("Failed to duplicate convesration \(id): \(error.localizedDescription)")
+        }
+        return nil
+    }
+    
+    func deleteConversation(for id: UUID) throws {
+        try ConversationService.deleteConversation(id: id)
+        conversations.removeAll(where: { $0.id == id })
+        if currentConversationID == id {
+            removeAllMessages()
+            currentConversationID = nil
+        }
+    }
+    
+    func createConversation() throws -> ConversationMetadata {
+        let newMeta = try ConversationService.createConversation(title: "New Discourse")
+        conversations.insert(newMeta, at: 0)
+        return newMeta
+    }
+    
+    /// returns the first instance of a ConversationMetadata that matches the `id` passed in, `nil` if missing
+    func getConversation(for id: UUID) -> ConversationMetadata? {
+        return self.conversations.first(where: {$0.id == id})
+    }
+    
+    /// renames the conversation and saves the metadata out to file as well
+    func renameConversation(_ id: UUID, to newTitle: String) {
+        do {
+            try ConversationService.setTitle(for: id, newTitle: newTitle)
+            if let i = conversations.firstIndex(where: { $0.id == id}) {
+                var conv = conversations[i]
+                conv.title = newTitle
+                conv.updatedAt = Date()
+                conversations[i] = conv
+            }
+        } catch {
+            reportError("Failed to rename: \(error.localizedDescription)")
+        }
+    }
+    
+    /// updates the first existing conversation that matches the id with the instance provided
+    /// and saves the metadata file
+    func updateConversation(id: UUID, withMeta: ConversationMetadata) throws {
+        if let i = conversations.firstIndex(where: { $0.id == id}) {
+            conversations[i] = withMeta
+        }
+        try ConversationService.saveMetadata(withMeta)
+    }
+    
+    /// moves the specified conversation to the top of the list (note: updatedAt time not flushed to file system)
+    func touchConversation(id: UUID) {
+        if let index = conversations.firstIndex(where: { $0.id == id }) {
+            var updated = conversations.remove(at: index)
+            updated.updatedAt = Date()
+            conversations.insert(updated, at: 0)
+        }
+    }
+    
     /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
     func calculatePromptTokenCount() async {
         if let config = modelConfig {
@@ -144,62 +241,63 @@ class AppState: ObservableObject {
             reportError("Error: No configuration available; hit that gear icon and setup the app.")
             return
         }
-        guard !config.modelPath.isEmpty else {
-            reportError("Error: No model path configured; make sure to setup the configuration.")
+        guard !config.modelPaths.isEmpty else {
+            reportError("Error: No model paths configured; make sure to setup the model in the configuration.")
             return
         }
-        
+        guard !config.modelBookmarks.isEmpty else {
+            reportError("Error: No model bookmark data; make sure to setup the model in the configuration.")
+            return
+        }
+
         isLoadingModel = true
         defer { isLoadingModel = false }
         
         // attempt to use the stored security scoped bookmark if one
         // was aquired for this model file when building the new
         // URL to access.
-        var modelURL: URL
-        if let bookmarkData = config.modelBookmark {
+        var activatedURLS: [URL] = []
+        for data in config.modelBookmarks {
             // Resolve the bookmark
             var isStale = false
-            do {
-                let options = URL.BookmarkResolutionOptions()
-                modelURL = try URL(resolvingBookmarkData: bookmarkData,
-                                   options: options,
-                                   relativeTo: nil,
-                                   bookmarkDataIsStale: &isStale)
-                
-                if isStale {
-                    // create a fresh bookmark from the resolved URL
-                    let freshBookmark = try modelURL.bookmarkData(
-                        options: .minimalBookmark,
-                        includingResourceValuesForKeys: nil,
-                        relativeTo: nil
-                    )
-                    config.modelBookmark = freshBookmark
-                    try PersistenceService.saveConfiguration(config)
-                    print("Info: Bookmark refreshed and saved successfully.")
+            
+            #if os(macOS)
+            let url = try? URL(resolvingBookmarkData: data,
+                               options: .withSecurityScope,
+                               relativeTo: nil,
+                               bookmarkDataIsStale: &isStale)
+            #else
+            let url = try? URL(resolvingBookmarkData: data,
+                               options: [],
+                               relativeTo: nil,
+                               bookmarkDataIsStale: &isStale)
+            #endif
+            if let url = url {
+                if url.startAccessingSecurityScopedResource() {
+                    activatedURLS.append(url)
                 }
-                
-                if modelURL.startAccessingSecurityScopedResource() {
-                    currentModelURL = modelURL
-                }
-            } catch {
-                reportError("Resource access failed: \(error.localizedDescription)")
-                return
             }
-        } else {
-            modelURL = URL(fileURLWithPath: config.modelPath)
+        }
+        
+        self.currentModelURLs = activatedURLS
+        if currentModelURLs.isEmpty {
+            reportError("Error: Could not obtain the security scoped bookmark data needed to load the model.")
+            return
         }
         
         // do the actual model loading
-        print("Loading model: \(modelURL.path)\n")
+        let modelURL = config.modelPaths.first!
+        print("Loading model: \(modelURL)\n")
         do {
             llamaContext = try await LlamaContext.createContext(
-                path: modelURL.path,
+                path: modelURL,
                 offloadCount: Int32(config.layerCountToOffload),
                 contextLength: UInt32(config.contextLength),
-                samplerSettings: config.customSampler)
+                samplerSettings: config.customSampler,
+                kvCacheType: config.kvCacheType)
             print("Info: Model loading complete.\n")
         } catch {
-            reportError("Error: failed to load model file \(modelURL.path()): \(error.localizedDescription)")
+            reportError("Error: failed to load model file \(modelURL): \(error.localizedDescription)")
         }
         
     }
@@ -208,8 +306,21 @@ class AppState: ObservableObject {
         await self.llamaContext?.unload()
         self.llamaContext = nil
         
-        currentModelURL?.stopAccessingSecurityScopedResource()
-        currentModelURL = nil
+        for url in currentModelURLs {
+            url.stopAccessingSecurityScopedResource()
+        }
+        currentModelURLs = []
+
+        // by creating an array and immediately asking for a value,
+        // we force the CPU to wait for the GPU to finish all pending
+        // tasks (including the deallocations from llama.cpp).
+        //
+        // without this, memory that we free from deallocating the
+        // LLM *won't actually be released* and another load will
+        // potentially hard-lock or force a reboot of the device.
+        let syncArray = MLXArray(Array(0...10))
+        _ = syncArray.sum().item(Int.self)
+        await Task.yield()
         
         print("Info: Model unloaded and security scope released.")
     }
@@ -217,7 +328,9 @@ class AppState: ObservableObject {
     /// Explicitly persists the current message log to disk.
     func saveChatLog() {
         do {
-            try PersistenceService.saveChatLog(messageLog)
+            if let currentID = currentConversationID {
+                try ConversationService.saveChatLog(messageLog, for: currentID)
+            }
         } catch {
             reportError("Warning: Failed to save chat log: \(error.localizedDescription)")
         }
@@ -247,10 +360,46 @@ class AppState: ObservableObject {
         // transform it into a Sendable tuple
         let processedMessages = await prepareMessagesForPrompt()
         
+        // add the system prompt this way.
+        var attemptingJinja = false
+        if config.chatTemplate == nil { // `nil` is jinja/autodetect
+            if let jinjaStr = await llamaContext.getChatTemplate() {
+                if let id = currentConversationID {
+                    if let conv = getConversation(for: id) {
+                        attemptingJinja = true
+                        var messages = processedMessages
+                        if let sysMsg = conv.systemMessage, sysMsg.isEmpty == false {
+                            // insert the system message as the first message in processedMessages
+                            messages = [(.system, sysMsg)] + messages
+                        }
+                        let templater = TemplateSevice.init(jinjaStr: jinjaStr)
+                        do {
+                            let prompt = try templater.render(
+                                messages: messages,
+                                addAssistant: !isContinue,
+                                enableThinking: config.enableThinking)
+                            return prompt
+                        } catch {
+                            print("WARNING: Failed to render jinja template: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        }
+        
         do {
+            if attemptingJinja {
+                // the only way to make it here is to have enough items to attempt a jinja run on the
+                // prompt building process only to have failed to generate a full prompt.
+                //
+                // for now we just print a warning about using the built-in templates...
+                print("WARNING: Embeded jinja failed for some reason; attemping fallback prompt processing...")
+            }
+            let conv = conversations.first(where: {$0.id == currentConversationID})
+            let systemMessage = conv?.systemMessage ?? ""
             return try await llamaContext.formatPrompt(
                 messages: processedMessages,
-                systemMessage: config.systemMessage,
+                systemMessage: systemMessage,
                 template: config.chatTemplate,
                 isContinue: isContinue)
         } catch {
@@ -260,13 +409,20 @@ class AppState: ObservableObject {
     
     // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse(isContinue: Bool = false) async {
+        // if we don't have a model loaded, then we do a reload right now
+        if llamaContext == nil {
+            await reloadModel()
+        }
+        
+        // ... and then make sure the loading actually worked.
         guard let llamaContext else {
-            reportError("Error: Model not loaded and it really should be at this point... Interesting.")
+            reportError("Error: Failed to load the language model. Double check your configuration.")
             return
         }
         
         // set the generation control flags appropriately and defer the reset of
         // the generation control flags to their default state
+        let thisConversationID = currentConversationID
         self.isGenerating = true
         self.shouldStopGenerating = false
         defer {
@@ -295,9 +451,15 @@ class AppState: ObservableObject {
             aiMessage = last
             fullResponse = last.content
         } else {
+            // a special case to handle on regular (non-continue) text generation is to
+            // see if the prompt ended in `<think>` because the template added in the
+            // thinking tag. If it does, I want to copy it into the message so that the
+            // thought detection works as intended.
+            let hasThinkingPlaceholder = prompt.trimmingSuffixWhitespace().hasSuffix("<think>")
+            
             // add placeholder AI message that we'll update as tokens arrive
-            aiMessage = Message(sender: .ai, content: "")
-            fullResponse = ""
+            aiMessage = Message(sender: .ai, content: hasThinkingPlaceholder ? "<think>" : "")
+            fullResponse = hasThinkingPlaceholder ? "<think>" : ""
             self.messageLog.append(aiMessage)
         }
         
@@ -363,6 +525,14 @@ class AppState: ObservableObject {
         
         // make sure to serialize as the final step so nothing's lost
         saveChatLog()
+        if let id = thisConversationID {
+            touchConversation(id: id)
+        }
+        
+        // call the callback, but only if we didn't cancel it
+        if !self.shouldStopGenerating {
+            self.onGenerationFinished?(aiMessage)
+        }
     }
     
     /// a rough token estimation (1 token ≈ 4 chars for English text) is used if a loaded model cannot tokenize directly
@@ -391,10 +561,17 @@ class AppState: ObservableObject {
         let numToPredict = await Int(llamaContext.numToPredict)
         var generationBudget = numToPredict
         if generationBudget == 0, let config = modelConfig {
-            generationBudget = config.reservedContextBuffer
+            generationBudget = max(0, config.reservedContextBuffer)
         }
-        
         let safetyThreshold = contextLength - generationBudget
+        
+        // get the length of the system message as well
+        var systemTokens = 0
+        if let id = currentConversationID, let conv = getConversation(for: id) {
+            if let sysMsg = conv.systemMessage, !sysMsg.isEmpty {
+                systemTokens = await getTokenCount(for: sysMsg) + perMessageOverhead
+            }
+        }
         
         // if we have a contextAnchorID for a message, then we only consider messages from
         // that message forward in time.
@@ -408,7 +585,8 @@ class AppState: ObservableObject {
         }
         
         // see if we can fit the current messages into our `safetyThreshold` from our anchor, onward
-        var totalTokens = 0
+        // start with the number of system tokens that already take up space...
+        var totalTokens = systemTokens
         for i in startIndex..<messageLog.count {
             let content = messageLog[i].parsedContent.responseContent
             totalTokens += await getTokenCount(for: content) + perMessageOverhead
@@ -417,8 +595,8 @@ class AppState: ObservableObject {
         if totalTokens > safetyThreshold {
             // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
             // so that the KV cache isn't constantly regenerating
-            let runwayTarget = (modelConfig?.reservedContextBuffer ?? numToPredict)
-            let limitWithRunway = safetyThreshold - runwayTarget
+            let runwayTarget = max(0, modelConfig?.contextRunway ?? numToPredict)
+            let limitWithRunway = max(0, safetyThreshold - runwayTarget)
             
             // slide the start index forward until we're under the limitWithRunway length
             while totalTokens > limitWithRunway && startIndex < messageLog.count - 1 {

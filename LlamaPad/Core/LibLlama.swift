@@ -7,6 +7,28 @@
 import Foundation
 import llama
 
+enum KVCacheType: String, Codable, CaseIterable {
+    case f16 = "F16 (None)"
+    case bf16 = "BF16"
+    case q8_0 = "Q8_0"
+    case q5_0 = "Q5_0"
+    case q5_1 = "Q5_1"
+    case q4_0 = "Q4_0"
+    case q4_1 = "Q4_1"
+    
+    nonisolated var ggmlType: llama.ggml_type {
+        switch self {
+        case .f16: return llama.GGML_TYPE_F16
+        case .bf16: return llama.GGML_TYPE_BF16
+        case .q8_0: return llama.GGML_TYPE_Q8_0
+        case .q5_0: return llama.GGML_TYPE_Q5_0
+        case .q5_1: return llama.GGML_TYPE_Q5_1
+        case .q4_0: return llama.GGML_TYPE_Q4_0
+        case .q4_1: return llama.GGML_TYPE_Q4_1
+        }
+    }
+}
+
 func initializeLlamaCppBackend() {
     llama_backend_init()
 }
@@ -179,17 +201,25 @@ actor LlamaContext: Sendable {
         if model != nil {
             llama_model_free(model)
         }
+        llama_backend_free()
     }
 
     // asynchronously load a model and create a LlamaContext
-    static func createContext(path: String, offloadCount: Int32, contextLength: UInt32, samplerSettings: SamplerSettings) async throws -> LlamaContext {
+    static func createContext(
+        path: String,
+        offloadCount: Int32,
+        contextLength: UInt32,
+        samplerSettings: SamplerSettings,
+        kvCacheType: KVCacheType = .f16)
+    async throws -> LlamaContext {
+        let cacheType = kvCacheType.ggmlType
         let initTask = Task.detached {
             return try autoreleasepool {
                 var model_params = llama_model_default_params()
                 model_params.n_gpu_layers = offloadCount
                 
-                // turning this off for better memory management
-                model_params.use_mmap = false
+                model_params.use_mmap = true
+                model_params.use_mlock = false
                 
 #if targetEnvironment(simulator)
                 // simulators don't support Metal
@@ -208,6 +238,8 @@ actor LlamaContext: Sendable {
                 ctx_params.n_batch = 512
                 ctx_params.n_threads       = Int32(maxThreads)
                 ctx_params.n_threads_batch = Int32(maxThreads)
+                ctx_params.type_k = cacheType
+                ctx_params.type_v = cacheType
                 
                 guard let ctx = llama_init_from_model(model, ctx_params) else {
                     throw LlamaError.contextInitFailed
@@ -274,8 +306,14 @@ actor LlamaContext: Sendable {
         if commonPrefixCount < residentTokens.count {
             let mem = llama_get_memory(context)
             // seq_id 0, from position commonPrefixCount to infinity (-1)
-            _ = llama_memory_seq_rm(mem, 0, Int32(commonPrefixCount), -1)
-            residentTokens.removeSubrange(commonPrefixCount...)
+            if llama_memory_seq_rm(mem, 0, Int32(commonPrefixCount), -1) {
+                residentTokens.removeSubrange(commonPrefixCount...)
+            } else {
+                // partial removal failed, so nuke the whole thing
+                _ = llama_memory_seq_rm(mem, 0, 0, -1)
+                residentTokens.removeAll()
+                commonPrefixCount = 0
+            }
         }
             
         // now we only decode the new tokens from the prompt
@@ -416,6 +454,8 @@ actor LlamaContext: Sendable {
                 role = "user"
             case .ai:
                 role = "assistant"
+            case .system:
+                role = "system"
             }
             
             // create C strings and throw an error if this fails
@@ -504,6 +544,32 @@ actor LlamaContext: Sendable {
 
         _ = llama_token_to_piece(vocab, token, buffer, Int32(length), 0, includeSpecials)
         return Array(UnsafeBufferPointer(start: buffer, count: length))
+    }
+    
+    /// pulls the Jinja chat template string from the loaded model.
+    func getChatTemplate() -> String? {
+        guard let model = self.model else { return nil }
+        
+        let cTemplate = llama_model_chat_template(model, nil)
+        guard let tmpl = cTemplate else { return nil }
+        
+        return String(cString: tmpl)
+    }
+
+    /// returns the string representation of the BOS (Beginning of Sentence) token.
+    func getBOSString() -> String {
+        guard let vocab else { return "" }
+        let bosToken = llama_vocab_bos(vocab)
+        let pieces = tokenToPiece(for: bosToken, includeSpecials: true)
+        return String(cString: pieces + [0])
+    }
+
+    /// returns the string representation of the EOS (End of Sentence) token.
+    func getEOSString() -> String {
+        guard let vocab else { return "" }
+        let eosToken = llama_vocab_eos(vocab)
+        let pieces = tokenToPiece(for: eosToken, includeSpecials: true)
+        return String(cString: pieces + [0])
     }
 
 }

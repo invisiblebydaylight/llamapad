@@ -5,6 +5,7 @@ import SwiftUI
 enum MessageSender: String, Codable {
     case user = "user"
     case ai = "ai"
+    case system = "system"
 }
 
 class Message: ObservableObject, Identifiable, Codable {
@@ -28,7 +29,7 @@ class Message: ObservableObject, Identifiable, Codable {
     // the content property, but with the thinking
     // content parsed into a separate string.
     @Published private(set) var parsedContent: ParsedMessage
-            
+    
     // keeps track of whether or not the 'think' block is expanded
     // in the UI for this message
     @Published var isThinkingExpanded: Bool = false
@@ -36,7 +37,8 @@ class Message: ObservableObject, Identifiable, Codable {
     init(sender: MessageSender, content: String) {
         self.sender = sender
         self.content = content
-        self.parsedContent = ParsedMessage.parse(content)
+        let parsedContent = ParsedMessage.parse(content)
+        self.parsedContent = parsedContent
     }
 
     required convenience init(from decoder: Decoder) throws {
