@@ -1,18 +1,40 @@
-# llamapad
+# llamapad (v0.2)
 
-A simple example of how to use [llama.cpp](https://github.com/ggml-org/llama.cpp/) for a 
-chat-style application that compiles on MacOS as well as iOS targets. The goal is to have
-a basic chat interface and configurable settings which will serve as a minimum viable
-product for text inference using llama.cpp as an embedded library so everything is self contained.
+A native MacOS and iOS chat application for local LLM inference, built on top of  
+[llama.cpp](https://github.com/ggml-org/llama.cpp/). Everything runs on-device.
+Nothing is sent to the cloud. The app is sandboxed and has only read-only access
+to just the files you select in the configuration; no network access or mic input.
 
-![The main chat interface](./screenshots/main_interface.png)
+Features conversation management, Jinja template support, text-to-speech
+and a privacy-first design philosophy.
+
+<a href="./screenshots/main_interface.png">
+    <img src="./screenshots/main_interface.png" style="max-width: 800px;" alt="The main chat interface">
+</a>
 
 The main chat window has a message bubble style with a collapsable view of the 'thinking'
 output of reasoning models. There's a simple 'trash' button to clear the log and a 'gear' button
-to show the configuration options. The screenshot below shows the basic settings, but
-more esoteric sampler settings like DRY and XTC are available under the advanced grouping.
+to show the configuration options. 
 
-![The basic configuration options](./screenshots/options.png)
+<a href="./screenshots/interface_explained.png">
+    <img src="./screenshots/interface_explained.png" style="max-width: 800px;" alt="The main chat interface">
+</a>
+
+The options window has several tabs. The first one hold options related to the LLM model itself.
+In the screenshot, you can see basic controls for the model and sampler, but when the advanced settings
+expand, there are multiple penalty types as well as basic DRY and XTC support.
+
+<a href="./screenshots/options.png">
+    <img src="./screenshots/options.png" style="max-width: 800px;" alt="The basic configuration options">
+</a>
+
+The voice tab shows shows the options for text-to-speech. In order to see the 'speak' 'button next to messages
+when hovering over them, you have TTS enabled. If auto-play is enabled, as soon as the AI message
+finishes generating it will attempt to speak it out loud using TTS.
+
+<a href="./screenshots/options_tts.png">
+    <img src="./screenshots/options_tts.png" style="max-width: 800px;" alt="The text-to-speech configuration options">
+</a>
 
 
 ## Features
@@ -66,7 +88,7 @@ and runs on the target device.
 
 * Using quantized KV cache instead of F16 may cause problems with flash attention on some models.
 * If you want to get wild and crazy with your Mac and increase the amount of memory usable
-  by metal, you can run a command like this (which sets the limit to 20GB):
+  by Metal, you can run a command like this (which sets the limit to 20GB) to boost your upper limit:
   `sudo sysctl iogpu.wired_limit_mb=20480`
 * If you're really pushing the memory limit of your device with the LLM, it's possible that
   you'll get errors when trying to use TTS and the error message will have a coreaudio exception.
@@ -79,7 +101,6 @@ and runs on the target device.
 Eventually, if interest continues, this application will get more features developed to make it
 a more robust experience:
 
-* Multiple model configuration support to make using many models easier.
 * Tool call support ; MCP support
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
 * Paralizable, batched requests that might be useful for behind-the-scenes agent stuff.
@@ -123,6 +144,9 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
 * Kokoro-ios is pinned to 1.0.10 because upgrading to 1.0.11 broke audio on iOS targets
   (https://github.com/mlalma/KokoroTestApp/issues/7).
+* Metal was really obnoxious about not releasing memory no matter how long the app sleeps after freeing the model,
+  context and sampler. Turns out, adding a dummy GPU operation using MLX forced a synchronization point, clearing
+  the Metal command queue which caused the memory to *actually* be released.
 
 
 ## License
