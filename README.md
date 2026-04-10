@@ -1,4 +1,4 @@
-# llamapad (v0.2)
+# llamapad (v0.2.1)
 
 A native MacOS and iOS chat application for local LLM inference, built on top of  
 [llama.cpp](https://github.com/ggml-org/llama.cpp/). Everything runs on-device.
@@ -49,6 +49,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
+* Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.
 * Lazy-loading the model is now supported. LLMs no longer load automatically on application startup. A Load/Eject
   button has been added next to the config button to manually control the behavior, otherwise the configured
   model is loaded when the user sends a message, generates a response or regenerates an existing one.
