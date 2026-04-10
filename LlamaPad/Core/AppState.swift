@@ -452,14 +452,20 @@ class AppState: ObservableObject {
             fullResponse = last.content
         } else {
             // a special case to handle on regular (non-continue) text generation is to
-            // see if the prompt ended in `<think>` because the template added in the
+            // see if the prompt ended in the thinking block because the template added in a
             // thinking tag. If it does, I want to copy it into the message so that the
             // thought detection works as intended.
-            let hasThinkingPlaceholder = prompt.trimmingSuffixWhitespace().hasSuffix("<think>")
-            
-            // add placeholder AI message that we'll update as tokens arrive
-            aiMessage = Message(sender: .ai, content: hasThinkingPlaceholder ? "<think>" : "")
-            fullResponse = hasThinkingPlaceholder ? "<think>" : ""
+            let hasThinkingPlaceholder = ThinkingPattern.all.contains { pattern in
+                prompt.trimmingSuffixWhitespace().hasSuffix(pattern.opening)
+            }
+
+            // Find which specific opening tag was used to initialize the message
+            let detectedOpening = ThinkingPattern.all.first { pattern in
+                prompt.trimmingSuffixWhitespace().hasSuffix(pattern.opening)
+            }?.opening ?? ""
+
+            aiMessage = Message(sender: .ai, content: hasThinkingPlaceholder ? detectedOpening : "")
+            fullResponse = hasThinkingPlaceholder ? detectedOpening : ""
             self.messageLog.append(aiMessage)
         }
         
