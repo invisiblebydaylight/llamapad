@@ -232,8 +232,9 @@ struct MessageView: View {
                     }
                 }
             }
-            .opacity(showTray ? 1.0 : 0.0)
+            .opacity(isEditing ? 1.0 : (showTray ? 1.0 : 0.0))
             .animation(.easeInOut(duration: 0.2), value: showTray)
+            .animation(.easeInOut(duration: 0.2), value: isEditing)
         }
     }
     
@@ -251,22 +252,38 @@ struct MessageView: View {
             
             // if we're editing, we put everything in the TextField, otherwise it's just a plain Text widget
             if isEditing {
-                TextEditor(text: $draftContent)
-                    .focused($isEditorFocused)
-                    .font(.body)
-                    .frame(minHeight: 40, maxHeight: 400)
-                    .scrollContentBackground(.hidden)
-                    .padding(4)
-                    .background(.clear)
-                    .onKeyPress(keys: [.return]) { press in
-                        if press.modifiers.contains(.command) {
-                            commitEditButtonAction()
-                            isEditing = false
-                            showTray = false
-                            armedButton = .None
+                VStack(spacing: 0) {
+                    TextEditor(text: $draftContent)
+                        .focused($isEditorFocused)
+                        .font(.body)
+                        .frame(minHeight: 40, maxHeight: 400)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(.clear)
+                        .onKeyPress(keys: [.return]) { press in
+                            if press.modifiers.contains(.command) {
+                                commitEditButtonAction()
+                                isEditing = false
+                                showTray = false
+                                armedButton = .None
+                            }
+                            return .ignored
                         }
-                        return .ignored
+                    
+                    // a small little reminder of what's going on with the editing process
+                    Divider().opacity(0.5)
+                    HStack {
+                        Spacer()
+                        Text(message.sender == .user ? "Editing your thoughts..." : "Correcting the machine...")
+                            .font(.caption2)
+                            .italic()
+                            .opacity(0.7)
+                            .padding(4)
                     }
+                }
+                .background(Color.black.opacity(0.1))
+                .cornerRadius(8)
+                .padding(4)
             } else {
                 MarkdownView(message.parsedContent.responseContent)
                     .textSelection(.enabled)
