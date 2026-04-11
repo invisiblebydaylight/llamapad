@@ -238,6 +238,26 @@ struct MessageView: View {
         }
     }
     
+    private var StatsRibbon: some View {
+        Group {
+            if let stats = message.stats, showTray {
+                HStack(spacing: 8) {
+                    Label("\(stats.promptTps, specifier: "%.1f") t/s", systemImage: "bolt.fill")
+                    Label("\(stats.generationTps, specifier: "%.1f") t/s", systemImage: "sparkles")
+                    
+                    if let modelName = stats.modelName {
+                        Text("•").foregroundColor(.secondary.opacity(0.5))
+                        Text(modelName).lineLimit(1).truncationMode(.tail)
+                    }
+                }
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(.secondary)
+                .padding(.top, 4)
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
+            }
+        }
+    }
+    
     private var MessageBubbleContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             // show thinking section if it exists and is from AI
@@ -332,7 +352,10 @@ struct MessageView: View {
                 }
                 // ai message alignment
                 else {
-                    MessageBubbleContent
+                    VStack {
+                        MessageBubbleContent
+                        StatsRibbon
+                    }
                     SidecarTray
                         .padding(.leading, 8)
                     Spacer()

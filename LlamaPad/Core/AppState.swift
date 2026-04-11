@@ -524,7 +524,13 @@ class AppState: ObservableObject {
         let prompt_tps = Double(actualTokensProcessed) / t_heat
         let generation_tps = Double(generatedTokens-1) / t_generation
         
-        print("Info: Generation complete:")
+        // record the performance stats in the message
+        let modelName = modelConfig?.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        aiMessage.stats = MessageStats(
+            modelName: modelName, promptTps: prompt_tps, generationTps: generation_tps
+        )
+        
+        print("Info: Generation complete (\(modelName)):")
         print("  Time to first token: \(t_heat)s")
         print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
         print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
