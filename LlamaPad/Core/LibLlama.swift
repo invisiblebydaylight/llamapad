@@ -37,7 +37,7 @@ func initializeLlamaCppBackend() {
         // current log levels are:
         //   0 = none, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = cont
         if level.rawValue >= 3 && level.rawValue <= 4 {
-            print("LLAMACPP [\(level)]: \(message)", terminator: "")
+            print("LLAMACPP [\(level.rawValue)]: \(message)", terminator: "")
         }
     }, nil)
         

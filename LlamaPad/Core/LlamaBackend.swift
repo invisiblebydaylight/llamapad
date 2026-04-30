@@ -251,54 +251,71 @@ class LlamaBackend : InferenceBackend {
         }
         let safetyThreshold = contextLength - generationBudget
         
+        // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
+        // so that the KV cache isn't constantly regenerating
+        let runwayTarget = max(0, modelConfig.contextRunway)
+        let limitWithRunway = max(0, safetyThreshold - runwayTarget)
+        
         // get the length of the system message as well
         var systemTokens = 0
         if let sysMsg = systemMessage, !sysMsg.isEmpty {
             systemTokens = await countTokens(for: sysMsg) + perMessageOverhead
         }
         
-        // if we have a contextAnchorID for a message, then we only consider messages from
-        // that message forward in time.
-        var startIndex = 0
-        if let anchorID = contextAnchorID {
-            if let index = messages.firstIndex(where: { $0.id == anchorID }) {
-                startIndex = index
-            } else {
-                // if not found, we reset the anchor and keep our startIndex at 0
-                contextAnchorID = nil
+        // walk backwards from the end, accumulating only what fits and stopping
+        // if we hit our context anchor
+        var totalTokens = systemTokens
+        var newStartIndex = messages.count
+        var safetyThresholdBreached = false
+
+        for i in stride(from: messages.count - 1, through: 0, by: -1) {
+            let msg = messages[i]
+            let content = msg.parsedContent.responseContent
+            let msgTokens = await countTokens(for: content) + perMessageOverhead
+            
+            // if budget is exceeded, pin the window to the previous message
+            // and break out of the loop
+            if totalTokens + msgTokens > safetyThreshold {
+                safetyThresholdBreached = true
+                newStartIndex = i + 1
+                break
+            }
+            
+            totalTokens += msgTokens
+            
+            // if we reach our anchor and still fit, we stop without sliding
+            if msg.id == contextAnchorID {
+                newStartIndex = i
+                break
             }
         }
         
-        // see if we can fit the current messages into our `safetyThreshold` from our anchor, onward
-        // start with the number of system tokens that already take up space...
-        var totalTokens = systemTokens
-        for i in startIndex..<messages.count {
-            let content = messages[i].parsedContent.responseContent
-            totalTokens += await countTokens(for: content) + perMessageOverhead
+        // check to see if we walked all the way through without adjusting newStartIndex
+        // and if so, that means it all fits and no anchor exists, so we include everything
+        if newStartIndex == messages.count {
+            newStartIndex = 0
         }
         
-        if totalTokens > safetyThreshold {
-            // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
-            // so that the KV cache isn't constantly regenerating
-            let runwayTarget = max(0, modelConfig.contextRunway)
-            let limitWithRunway = max(0, safetyThreshold - runwayTarget)
-            
-            // slide the start index forward until we're under the limitWithRunway length
-            while totalTokens > limitWithRunway && startIndex < messages.count - 1 {
-                let content = messages[startIndex].parsedContent.responseContent
+        if safetyThresholdBreached {
+            // we need runway. remove messages from the front of our window
+            // until we're under limitWithRunway. this creates the "gap" that
+            // keeps the KV cache stable for several turns before we slide again.
+            while newStartIndex < messages.count && totalTokens > limitWithRunway {
+                let content = messages[newStartIndex].parsedContent.responseContent
                 let msgTokens = await countTokens(for: content) + perMessageOverhead
                 totalTokens -= msgTokens
-                startIndex += 1
+                newStartIndex += 1
             }
-            
-            // adjust the anchor to point to this new Message
-            contextAnchorID = messages[startIndex].id
-        } else if contextAnchorID == nil && !messages.isEmpty {
-            contextAnchorID = messages.first!.id
+            print("Reworking runway: new index is \(newStartIndex) with total tokens of \(totalTokens)")
+        }
+        
+        // update the anchor point if needed
+        if !messages.isEmpty && contextAnchorID != messages[newStartIndex].id {
+            contextAnchorID = messages[newStartIndex].id
         }
 
         // convert our stable 'window' into the messageLog into the returned format
-        return messages[startIndex...].compactMap { message in
+        return messages[newStartIndex...].compactMap { message in
             let content = message.parsedContent.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !content.isEmpty else { return nil }
             return (sender: message.sender, content: content)

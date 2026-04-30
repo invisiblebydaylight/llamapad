@@ -66,7 +66,7 @@ struct ContentView: View {
                             Spacer()
                             
                             HStack(spacing: 12) {
-                                Text("Last promtp used: \(promptTokens) tokens (\(usagePercentage, specifier: "%.1f")%)")
+                                Text("Last prompt used: \(promptTokens) tokens (\(usagePercentage, specifier: "%.1f")%)")
                             }
                             
                             Spacer()
