@@ -30,6 +30,17 @@ enum KVCacheType: String, Codable, CaseIterable {
 }
 
 func initializeLlamaCppBackend() {
+    llama_log_set({ level, text, _ in
+        guard let text = text else { return }
+        let message = String(cString: text)
+        // only print if it's an actual problem.
+        // current log levels are:
+        //   0 = none, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = cont
+        if level.rawValue >= 3 && level.rawValue <= 4 {
+            print("LLAMACPP [\(level)]: \(message)", terminator: "")
+        }
+    }, nil)
+        
     llama_backend_init()
 }
 
@@ -266,7 +277,7 @@ actor LlamaContext: Sendable {
     // number of tokens in the `text` String because it will reuse
     // already digested tokens if possible.
     func completionInit(text: String,
-                        procUpdate: @Sendable @escaping (Double)async->Void = { _ in },
+                        procUpdate: @Sendable @escaping (Double, Int)async->Void = { _, _ in },
                         canContinue: @Sendable @escaping ()async->Bool = { true }
     ) async throws -> Int {
         isDone = false
@@ -278,7 +289,7 @@ actor LlamaContext: Sendable {
             throw LlamaError.couldNotInitializeContext
         }
 
-        await procUpdate(0.0) 
+        await procUpdate(0.0, 0)
         
         let addBOS = llama_vocab_get_add_bos(vocab)
         let newTokens = tokenize(text: text, addBOS: addBOS)
@@ -350,7 +361,7 @@ actor LlamaContext: Sendable {
                     throw LlamaError.decodeFailed
                 }
                 tokensDecoded += Int(n_eval)
-                await procUpdate(Double(tokensDecoded) / Double(tokensToDecode.count))
+                await procUpdate(Double(tokensDecoded) / Double(tokensToDecode.count), tokensDecoded)
                 
             }
         }
@@ -359,7 +370,7 @@ actor LlamaContext: Sendable {
         // of tokens actually decoded in this call.
         let actualCount = commonPrefixCount + tokensDecoded
         self.residentTokens = Array(newTokens.prefix(actualCount))
-        await procUpdate(1.0)
+        await procUpdate(1.0, tokensDecoded)
         
         return tokensDecoded
     }

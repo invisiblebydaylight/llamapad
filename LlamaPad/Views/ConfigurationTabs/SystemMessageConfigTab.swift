@@ -14,12 +14,12 @@ struct SystemMessageConfigTab: View {
                     .scrollContentBackground(.hidden)
                     .onChange(of: systemMessage) {
                         Task {
-                            tokenCount = await appState.getTokenCount(for: systemMessage)
+                            tokenCount = await appState.backend?.countTokens(for: systemMessage) ?? 0
                         }
                     }
                     .onAppear(){
                         Task {
-                            tokenCount = await appState.getTokenCount(for: systemMessage)
+                            tokenCount = await appState.backend?.countTokens(for: systemMessage) ?? 0
                         }
                     }
                 

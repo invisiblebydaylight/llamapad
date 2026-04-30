@@ -7,6 +7,7 @@ struct NavigationBarView: View {
     @State private var isShowingDeleteConfirmation = false
     
     var body: some View {
+        let isLoaded = appState.backend?.isLoaded ?? false
         HStack {
             Button(action: {
                 isShowingDeleteConfirmation = true
@@ -55,7 +56,7 @@ struct NavigationBarView: View {
             Button(action: {
                 // this button acts as a toggle and should load the model if not loaded
                 // and free it otherwise if it already is loaded.
-                if appState.llamaContext == nil {
+                if !isLoaded{
                     Task {
                         await appState.reloadModel()
                     }
@@ -66,11 +67,11 @@ struct NavigationBarView: View {
                 }
             }) {
                 VStack(spacing: 2){
-                    Image(systemName: appState.llamaContext != nil ? "eject" : "arrow.down.circle")
+                    Image(systemName: isLoaded ? "eject" : "arrow.down.circle")
                         .font(.title2)
                         .foregroundColor(.primary)
                         .padding(4)
-                    Text(appState.llamaContext != nil ? "Eject" : "Load")
+                    Text(isLoaded ? "Eject" : "Load")
                 }
             }
             .disabled(appState.isBusy)

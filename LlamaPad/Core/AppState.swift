@@ -1,14 +1,13 @@
 import Foundation
 import Combine
 import SwiftUI
-import MLX
 
 @MainActor
 class AppState: ObservableObject {
-    /// this should be set to the URL used to load the model and used to
-    /// track security access for it.
-    private var currentModelURLs: [URL] = []
-    
+    @Published var backend: InferenceBackend?
+
+    @Published var isBackendLoading: Bool = false
+
     @Published var modelConfig: AppConfiguration?
     
     /// the loaded conversations the app is tracking
@@ -19,16 +18,6 @@ class AppState: ObservableObject {
     
     /// main storage for all of the messages in the log
     @Published var messageLog: [Message] = []
-    
-    /// tracks the first message to be included in the prompt allowing some maintenance
-    /// of KV cache stability so that constant prompt ingestion doesn't have to happen.
-    @Published var contextAnchorID: UUID?
-    
-    /// keeps track of the loaded LLM and its context
-    @Published var llamaContext: LlamaContext?
-    
-    /// this should be set to true while waiting to load the model
-    @Published var isLoadingModel = false
     
     /// will be set to true if the app is generating text with AI
     @Published var isGenerating = false
@@ -41,9 +30,6 @@ class AppState: ObservableObject {
     
     /// whether or not to show the error alert with the lastErrorMessage text
     @Published var showingErrorAlert = false
-    
-    /// saves the token count of the last prompt used to generate a response
-    @Published var lastPromptTokenCount: Int = 0
     
     /// used to track the processing status for the app (like prompt ingestion); 0.0..1.0 range.
     @Published var processingProgress: Double? = nil
@@ -58,7 +44,7 @@ class AppState: ObservableObject {
     /// returns `true` if the app is currently performing a long, heavy action
     /// like loading a model or generating a reply - something that should not be interrupted.
     var isBusy: Bool {
-        return isGenerating || isLoadingModel
+        return isGenerating
     }
     
     init() {
@@ -102,52 +88,64 @@ class AppState: ObservableObject {
     
     /// unloads any loaded model and then reloads the model specified in the configuration
     func reloadModel() async {
-        await unloadModel()
-        await loadModelFromConfiguration()
-        Task {
-            await calculatePromptTokenCount()
+        guard let config = modelConfig else {
+            reportError("No configuration loaded, unable to reload model.")
+            return
         }
+        
+        self.isBackendLoading = true
+        defer { self.isBackendLoading = false }
+        
+        // bury the old backend if one exists
+        if let old = backend {
+            await old.unload()
+            self.backend = nil
+        }
+
+        // spawn the correct concrete backend
+        let newBackend: InferenceBackend = LlamaBackend()
+        do {
+            try await newBackend.load(from: config)
+            self.backend = newBackend
+        } catch {
+            self.backend = nil
+            reportError("Loading error: \(error.localizedDescription)")
+        }
+    }
+    
+    /// unloads the current backend's model if any and drops the backend implementation
+    func unloadModel() async {
+        await backend?.unload()
+        self.backend = nil
+        self.isBackendLoading = false
     }
     
     /// removes all the messages in the `messageLog` and resets the prompt token counter on a background Task
     func removeAllMessages() {
         messageLog.removeAll()
-        Task {
-            await calculatePromptTokenCount()
-        }
     }
     
     /// removes a specific message in the `messageLog` that matches the `id` passed in
     func removeMessage(id: UUID) {
         messageLog.removeAll(where: { $0.id == id })
-        Task {
-            await calculatePromptTokenCount()
-        }
     }
     
     /// Removes the specified message and every message that follows it in the log.
     func purgeMessages(from id: UUID) {
         if let index = messageLog.firstIndex(where: { $0.id == id }) {
             messageLog.removeSubrange(index...)
-            Task {
-                await calculatePromptTokenCount()
-            }
         }
     }
     
     func selectConversation(_ id: UUID?) {
         self.currentConversationID = id
-        self.contextAnchorID = nil
         self.messageLog = []
-        
+
         // load the new conversation's chat log
         if let id = id {
             do {
                 let newLog = try ConversationService.loadChatLog(for: id)
                 self.messageLog = newLog
-                Task {
-                    await self.calculatePromptTokenCount()
-                }
             } catch {
                 self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
             }
@@ -183,7 +181,8 @@ class AppState: ObservableObject {
     }
     
     /// returns the first instance of a ConversationMetadata that matches the `id` passed in, `nil` if missing
-    func getConversation(for id: UUID) -> ConversationMetadata? {
+    func getConversation(for id: UUID?) -> ConversationMetadata? {
+        guard let id else { return nil }
         return self.conversations.first(where: {$0.id == id})
     }
     
@@ -219,112 +218,7 @@ class AppState: ObservableObject {
             conversations.insert(updated, at: 0)
         }
     }
-    
-    /// if we can build a prompt, then calculate the tokens used for it; if we can't build a prompt, there's no change.
-    func calculatePromptTokenCount() async {
-        if let config = modelConfig {
-            if config.maxGenerationLength != 0 {
-                await llamaContext?.setNumberToPredict(config.maxGenerationLength)
-            } else {
-                await llamaContext?.setNumberToPredict(config.reservedContextBuffer)
-            }
-        }
         
-        let prompt = await buildPrompt(isContinue:false)
-        if let prompt {
-            self.lastPromptTokenCount = await llamaContext?.tokenize(text: prompt, addBOS: false).count ?? 0
-        }
-    }
-    
-    private func loadModelFromConfiguration() async {
-        guard let config = modelConfig else {
-            reportError("Error: No configuration available; hit that gear icon and setup the app.")
-            return
-        }
-        guard !config.modelPaths.isEmpty else {
-            reportError("Error: No model paths configured; make sure to setup the model in the configuration.")
-            return
-        }
-        guard !config.modelBookmarks.isEmpty else {
-            reportError("Error: No model bookmark data; make sure to setup the model in the configuration.")
-            return
-        }
-
-        isLoadingModel = true
-        defer { isLoadingModel = false }
-        
-        // attempt to use the stored security scoped bookmark if one
-        // was aquired for this model file when building the new
-        // URL to access.
-        var activatedURLS: [URL] = []
-        for data in config.modelBookmarks {
-            // Resolve the bookmark
-            var isStale = false
-            
-            #if os(macOS)
-            let url = try? URL(resolvingBookmarkData: data,
-                               options: .withSecurityScope,
-                               relativeTo: nil,
-                               bookmarkDataIsStale: &isStale)
-            #else
-            let url = try? URL(resolvingBookmarkData: data,
-                               options: [],
-                               relativeTo: nil,
-                               bookmarkDataIsStale: &isStale)
-            #endif
-            if let url = url {
-                if url.startAccessingSecurityScopedResource() {
-                    activatedURLS.append(url)
-                }
-            }
-        }
-        
-        self.currentModelURLs = activatedURLS
-        if currentModelURLs.isEmpty {
-            reportError("Error: Could not obtain the security scoped bookmark data needed to load the model.")
-            return
-        }
-        
-        // do the actual model loading
-        let modelURL = config.modelPaths.first!
-        print("Loading model: \(modelURL)\n")
-        do {
-            llamaContext = try await LlamaContext.createContext(
-                path: modelURL,
-                offloadCount: Int32(config.layerCountToOffload),
-                contextLength: UInt32(config.contextLength),
-                samplerSettings: config.customSampler,
-                kvCacheType: config.kvCacheType)
-            print("Info: Model loading complete.\n")
-        } catch {
-            reportError("Error: failed to load model file \(modelURL): \(error.localizedDescription)")
-        }
-        
-    }
-    
-    func unloadModel() async {
-        await self.llamaContext?.unload()
-        self.llamaContext = nil
-        
-        for url in currentModelURLs {
-            url.stopAccessingSecurityScopedResource()
-        }
-        currentModelURLs = []
-
-        // by creating an array and immediately asking for a value,
-        // we force the CPU to wait for the GPU to finish all pending
-        // tasks (including the deallocations from llama.cpp).
-        //
-        // without this, memory that we free from deallocating the
-        // LLM *won't actually be released* and another load will
-        // potentially hard-lock or force a reboot of the device.
-        let syncArray = MLXArray(Array(0...10))
-        _ = syncArray.sum().item(Int.self)
-        await Task.yield()
-        
-        print("Info: Model unloaded and security scope released.")
-    }
-    
     /// Explicitly persists the current message log to disk.
     func saveChatLog() {
         do {
@@ -346,80 +240,14 @@ class AppState: ObservableObject {
 #endif
     }
     
-    /// builds the prompt for text generation based off the loaded model, the configuration and the messages.
-    /// if it's unable to build a prompt, `nil` is returned
-    private func buildPrompt(isContinue: Bool) async -> String? {
-        guard let config = modelConfig else {
-            return nil
-        }
-        guard let llamaContext else {
-            return nil
-        }
-        
-        // prepare messages (remove thinking blocks, filter by context) and
-        // transform it into a Sendable tuple
-        let processedMessages = await prepareMessagesForPrompt()
-        
-        // add the system prompt this way.
-        var attemptingJinja = false
-        if config.chatTemplate == nil { // `nil` is jinja/autodetect
-            if let jinjaStr = await llamaContext.getChatTemplate() {
-                if let id = currentConversationID {
-                    if let conv = getConversation(for: id) {
-                        attemptingJinja = true
-                        var messages = processedMessages
-                        if let sysMsg = conv.systemMessage, sysMsg.isEmpty == false {
-                            // insert the system message as the first message in processedMessages
-                            messages = [(.system, sysMsg)] + messages
-                        }
-                        let templater = TemplateSevice.init(jinjaStr: jinjaStr)
-                        do {
-                            let prompt = try templater.render(
-                                messages: messages,
-                                addAssistant: !isContinue,
-                                enableThinking: config.enableThinking)
-                            return prompt
-                        } catch {
-                            print("WARNING: Failed to render jinja template: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            }
-        }
-        
-        do {
-            if attemptingJinja {
-                // the only way to make it here is to have enough items to attempt a jinja run on the
-                // prompt building process only to have failed to generate a full prompt.
-                //
-                // for now we just print a warning about using the built-in templates...
-                print("WARNING: Embeded jinja failed for some reason; attemping fallback prompt processing...")
-            }
-            let conv = conversations.first(where: {$0.id == currentConversationID})
-            let systemMessage = conv?.systemMessage ?? ""
-            return try await llamaContext.formatPrompt(
-                messages: processedMessages,
-                systemMessage: systemMessage,
-                template: config.chatTemplate,
-                isContinue: isContinue)
-        } catch {
-            return nil
-        }
-    }
-    
-    // generates an AI response based on the current message log using the embedded model formatting
     func generateChatResponse(isContinue: Bool = false) async {
-        // if we don't have a model loaded, then we do a reload right now
-        if llamaContext == nil {
-            await reloadModel()
-        }
-        
-        // ... and then make sure the loading actually worked.
-        guard let llamaContext else {
+        // if no backend, load one
+        if backend == nil { await reloadModel() }
+        guard let backend else {
             reportError("Error: Failed to load the language model. Double check your configuration.")
             return
         }
-        
+
         // set the generation control flags appropriately and defer the reset of
         // the generation control flags to their default state
         let thisConversationID = currentConversationID
@@ -431,92 +259,60 @@ class AppState: ObservableObject {
             reportProcessStatus(progress: nil, status: nil)
         }
         
-        await llamaContext.setNumberToPredict(modelConfig!.maxGenerationLength)
-        
-        // build out the prompt
-        let prompt = await Task.detached {
-            return await self.buildPrompt(isContinue: isContinue)
-        }.value
-        
-        guard let prompt else {
-            reportError("Failed to build the prompt from the message log. Aborting generation.")
-            return
-        }
-        print("Info: PROMPT------>\n\(prompt)\n<----END PROMPT")
-        
-        var fullResponse: String
         let aiMessage: Message
         if isContinue, let last = messageLog.last {
             // if we're continuing we don't append a new message
             aiMessage = last
-            fullResponse = last.content
         } else {
-            // a special case to handle on regular (non-continue) text generation is to
-            // see if the prompt ended in the thinking block because the template added in a
-            // thinking tag. If it does, I want to copy it into the message so that the
-            // thought detection works as intended.
-            let hasThinkingPlaceholder = ThinkingPattern.all.contains { pattern in
-                prompt.trimmingSuffixWhitespace().hasSuffix(pattern.opening)
-            }
-
-            // Find which specific opening tag was used to initialize the message
-            let detectedOpening = ThinkingPattern.all.first { pattern in
-                prompt.trimmingSuffixWhitespace().hasSuffix(pattern.opening)
-            }?.opening ?? ""
-
-            aiMessage = Message(sender: .ai, content: hasThinkingPlaceholder ? detectedOpening : "")
-            fullResponse = hasThinkingPlaceholder ? detectedOpening : ""
+            aiMessage = Message(sender: .ai, content:  "")
             self.messageLog.append(aiMessage)
         }
         
         // initialize completion
         var actualTokensProcessed: Int = 0
         let t_start = DispatchTime.now().uptimeNanoseconds
-        do {
-            actualTokensProcessed = try await llamaContext.completionInit(
-                text: prompt,
-                procUpdate: { pct in
-                    await MainActor.run {
-                        self.reportProcessStatus(progress: pct, status: "Processing prompt...")
-                    }
-                },
-                canContinue: { @MainActor in
-                    return !self.shouldStopGenerating
-                }
-            )
-            // ensure the process reporting gets reset
-            reportProcessStatus(progress: nil, status: nil)
-        } catch {
-            // remove prediction placeholder on failure
-            reportError("Completion initialization failed: \(error.localizedDescription)")
-            self.messageLog.removeLast()
-            return
-        }
-        self.lastPromptTokenCount =  await llamaContext.getTokenCount()
-        
-        // generate tokens and update UI incrementally
+
+        let currentConversation = getConversation(for: currentConversationID)
         var generatedTokens = 0
         var timeToFirstToken: UInt64 = 0
-        self.reportProcessStatus(progress: nil, status: nil)
-        while await !llamaContext.isDone && !self.shouldStopGenerating {
-            do {
-                let nextChunk = try await llamaContext.completionStep()
-                fullResponse.append(nextChunk)
-                
-                // update the ai message with accumulated content
-                aiMessage.content = fullResponse
-                generatedTokens += 1
-                
-                // do some special tracking for the first token
-                if generatedTokens == 1 {
-                    timeToFirstToken = DispatchTime.now().uptimeNanoseconds
+        do {
+            let stream = try await backend.generate(
+                messages: messageLog,
+                systemMessage: currentConversation?.systemMessage,
+                isContinuation: isContinue,
+                maxTokens: modelConfig!.maxGenerationLength
+            )
+                        
+            // generate tokens and update UI incrementally
+            self.reportProcessStatus(progress: nil, status: nil)
+            
+            for try await chunk in stream {
+                // if something has set our 'shouldStopGenerating' flag, this will be the
+                // point at which we bail out of the prediction stream. upstream (hah!)
+                // code has to catch the termination and cancel the task to truly stop it.
+                if shouldStopGenerating {
+                    break;
                 }
-            } catch {
-                reportError("Token generation failed: \(error.localizedDescription)")
-                break
+                
+                if chunk.isPromptProcessing {
+                    actualTokensProcessed = chunk.tokensDecoded
+                    self.reportProcessStatus(progress: chunk.promptProgress,
+                                             status: "Processing prompt...")
+                } else {
+                    aiMessage.content.append(chunk.text)
+                    generatedTokens = chunk.tokensGenerated
+                    
+                    // do some special tracking for the first token
+                    if generatedTokens == 1 {
+                        timeToFirstToken = DispatchTime.now().uptimeNanoseconds
+                    }
+                }
             }
+        } catch {
+            reportError("Error generating response: \(error.localizedDescription)")
+            return
         }
-        
+
         // print statistics
         let t_heat = Double(Int64(timeToFirstToken) - Int64(t_start)) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
@@ -544,91 +340,6 @@ class AppState: ObservableObject {
         // call the callback, but only if we didn't cancel it
         if !self.shouldStopGenerating {
             self.onGenerationFinished?(aiMessage)
-        }
-    }
-    
-    /// a rough token estimation (1 token ≈ 4 chars for English text) is used if a loaded model cannot tokenize directly
-    func getTokenCount(for text: String) async -> Int {
-        guard let llamaContext = llamaContext else {
-            return max(1, text.count / 4)
-        }
-        
-        return await llamaContext.tokenize(text: text, addBOS: false).count
-    }
-    
-    // prepares messages for prompt by removing thinking blocks and filtering by context size
-    private func prepareMessagesForPrompt() async -> [(sender: MessageSender, content: String)] {
-        guard let llamaContext = llamaContext else { return [] }
-        let contextLength = Int(llamaContext.contextLength)
-        
-        // this is the number of tokens to add representing the number of tokens
-        // a potential chat format might add, per message. by default this is
-        // a somewhat pessimistic value.
-        let perMessageOverhead = 10
-        
-        // make sure we have space for our text generation
-        // if `maxGenerationLength` is 0, we treat this as unbound, so we then check
-        // the `reservedContextBuffer` setting to see how much of the context to
-        // reserve for the space to the AI reply in.
-        let numToPredict = await Int(llamaContext.numToPredict)
-        var generationBudget = numToPredict
-        if generationBudget == 0, let config = modelConfig {
-            generationBudget = max(0, config.reservedContextBuffer)
-        }
-        let safetyThreshold = contextLength - generationBudget
-        
-        // get the length of the system message as well
-        var systemTokens = 0
-        if let id = currentConversationID, let conv = getConversation(for: id) {
-            if let sysMsg = conv.systemMessage, !sysMsg.isEmpty {
-                systemTokens = await getTokenCount(for: sysMsg) + perMessageOverhead
-            }
-        }
-        
-        // if we have a contextAnchorID for a message, then we only consider messages from
-        // that message forward in time.
-        var startIndex = 0
-        if let anchorID = contextAnchorID {
-            if let index = messageLog.firstIndex(where: { $0.id == anchorID }) {
-                startIndex = index
-            } else {
-                contextAnchorID = nil
-            }
-        }
-        
-        // see if we can fit the current messages into our `safetyThreshold` from our anchor, onward
-        // start with the number of system tokens that already take up space...
-        var totalTokens = systemTokens
-        for i in startIndex..<messageLog.count {
-            let content = messageLog[i].parsedContent.responseContent
-            totalTokens += await getTokenCount(for: content) + perMessageOverhead
-        }
-        
-        if totalTokens > safetyThreshold {
-            // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
-            // so that the KV cache isn't constantly regenerating
-            let runwayTarget = max(0, modelConfig?.contextRunway ?? numToPredict)
-            let limitWithRunway = max(0, safetyThreshold - runwayTarget)
-            
-            // slide the start index forward until we're under the limitWithRunway length
-            while totalTokens > limitWithRunway && startIndex < messageLog.count - 1 {
-                let content = messageLog[startIndex].parsedContent.responseContent
-                let msgTokens = await getTokenCount(for: content) + perMessageOverhead
-                totalTokens -= msgTokens
-                startIndex += 1
-            }
-            
-            // adjust the anchor to point to this new Message
-            contextAnchorID = messageLog[startIndex].id
-        } else if contextAnchorID == nil && !messageLog.isEmpty {
-            contextAnchorID = messageLog.first!.id
-        }
-
-        // convert our stable 'window' into the messageLog into the returned format
-        return messageLog[startIndex...].compactMap { message in
-            let content = message.parsedContent.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !content.isEmpty else { return nil }
-            return (sender: message.sender, content: content)
         }
     }
 }

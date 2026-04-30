@@ -59,15 +59,14 @@ struct ContentView: View {
                     }
                 )
                 
-                if appState.llamaContext != nil {
+                if let promptTokens = appState.backend?.lastPromptTokenCount {
                     if let config = appState.modelConfig {
-                        let promptTokens = appState.lastPromptTokenCount
                         let usagePercentage = Double(promptTokens) / Double(config.contextLength) * 100
                         HStack {
                             Spacer()
                             
                             HStack(spacing: 12) {
-                                Text("Context used: \(promptTokens)/\(config.contextLength) (\(usagePercentage, specifier: "%.1f")%)")
+                                Text("Last promtp used: \(promptTokens) tokens (\(usagePercentage, specifier: "%.1f")%)")
                             }
                             
                             Spacer()
@@ -80,8 +79,8 @@ struct ContentView: View {
                     }
                 }
             }
-            .blur(radius: appState.isLoadingModel ? 3 : 0)
-            .allowsHitTesting(!appState.isLoadingModel)
+            .blur(radius: appState.isBackendLoading ? 3 : 0)
+            .allowsHitTesting(!appState.isBackendLoading)
             .sheet(isPresented: $showingConfiguration) {
                 ConfigurationView(appState: appState)
                     .frame(minWidth: 400, minHeight: 600)
@@ -104,7 +103,7 @@ struct ContentView: View {
                 Text(appState.lastErrorMessage ?? "An unknown error occurred.")
             }
             
-            if appState.isLoadingModel {
+            if appState.isBackendLoading {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                 

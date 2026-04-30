@@ -9,7 +9,7 @@ class LlamaPadAppDelegate: NSObject, ApplicationDelegate {
     weak var appState: AppState?
     
     func applicationWillTerminate(_ notification: Notification) {
-        appState?.llamaContext?.unload()
+        appState?.backend?.shutdown()
         shutdownLlamaCppBackend()
     }
 }
@@ -26,7 +26,7 @@ class LlamaPadAppDelegate: NSObject, ApplicationDelegate {
     weak var appState: AppState?
     
     func applicationWillTerminate(_ application: UIApplication) {
-        appState?.llamaContext?.unload()
+        appState?.backend?.shutdown()
         shutdownLlamaCppBackend()
     }
 }
