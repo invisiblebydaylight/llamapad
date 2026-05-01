@@ -118,27 +118,6 @@ class LlamaBackend : InferenceBackend {
         shutdownLlamaCppBackend()
     }
     
-    /// returns the total token count of the messages and system message unless no model is loaded (needed for tokenizing) in which case it returns nil
-    func countTokensForPrompt(messages: [Message],
-                     systemMessage: String?) async -> Int {
-        guard llamaContext != nil else {
-            return 0
-        }
-
-        var totalTokens = 0
-        for msg in messages {
-            let content = msg.parsedContent.responseContent
-            let msgTokens = await countTokens(for: content)
-            totalTokens += msgTokens
-        }
-        if let systemMessage = systemMessage {
-            let sysTokens = await countTokens(for: systemMessage)
-            totalTokens += sysTokens
-        }
-        
-        return totalTokens
-    }
-    
     /// returns to the total token count of the string, or nil if a model wasn't loaded (needed for tokenizing)
     func countTokens(for text: String) async -> Int {
         guard let llamaContext = llamaContext else {
@@ -306,7 +285,6 @@ class LlamaBackend : InferenceBackend {
                 totalTokens -= msgTokens
                 newStartIndex += 1
             }
-            print("Reworking runway: new index is \(newStartIndex) with total tokens of \(totalTokens)")
         }
         
         // update the anchor point if needed

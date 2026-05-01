@@ -44,7 +44,7 @@ class AppState: ObservableObject {
     /// returns `true` if the app is currently performing a long, heavy action
     /// like loading a model or generating a reply - something that should not be interrupted.
     var isBusy: Bool {
-        return isGenerating
+        return isGenerating || isBackendLoading
     }
     
     init() {
@@ -247,6 +247,10 @@ class AppState: ObservableObject {
             reportError("Error: Failed to load the language model. Double check your configuration.")
             return
         }
+        guard let modelConfig = modelConfig else {
+            reportError("Error: Application configuration is not loaded yet so a response cannot be generated.")
+            return
+        }
 
         // set the generation control flags appropriately and defer the reset of
         // the generation control flags to their default state
@@ -280,7 +284,7 @@ class AppState: ObservableObject {
                 messages: messageLog,
                 systemMessage: currentConversation?.systemMessage,
                 isContinuation: isContinue,
-                maxTokens: modelConfig!.maxGenerationLength
+                maxTokens: modelConfig.maxGenerationLength
             )
                         
             // generate tokens and update UI incrementally
@@ -321,7 +325,7 @@ class AppState: ObservableObject {
         let generation_tps = Double(generatedTokens-1) / t_generation
         
         // record the performance stats in the message
-        let modelName = modelConfig?.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        let modelName = modelConfig.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
         aiMessage.stats = MessageStats(
             modelName: modelName, promptTps: prompt_tps, generationTps: generation_tps
         )

@@ -31,7 +31,6 @@ protocol InferenceBackend: AnyObject {
     func shutdown()
     
     func countTokens(for text: String) async -> Int
-    func countTokensForPrompt(messages: [Message], systemMessage: String?) async -> Int
     
     func generate(
         messages: [Message],
