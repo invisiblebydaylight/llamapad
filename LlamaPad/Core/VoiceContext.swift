@@ -1,9 +1,9 @@
-import KokoroSwift
 import MLX
 import CoreML
 import AVFoundation
 import Combine
 import Safetensors
+import MLXAudioTTS
 
 enum VoiceError: LocalizedError {
     case noVoiceTensor
@@ -41,14 +41,11 @@ class VoiceContext: ObservableObject {
     private var currentModelURL: URL?
     private var currentVoiceURL: URL?
 
-    /// the loaded kokoro-ios engine
-    private var tts: KokoroTTS?
+    /// the loaded kokoro engine
+    private var tts: KokoroModel?
     
-    /// the loaded safetensors voice file for the kokoro model
-    private var currentVoice: MLXArray?
-
     var isLoaded: Bool {
-        return tts != nil && currentVoice != nil
+        return tts != nil
     }
 
     init() {
@@ -72,7 +69,7 @@ class VoiceContext: ObservableObject {
     
     /// loads the kokoro model safetensors file and the selected kokoro voice safetensors file and throws
     /// an exception if something goes wrong.
-    private func loadModelFiles(modelSafetensors: URL, voiceSafetensors: URL) async throws {
+    private func loadModelFiles(modelDirectory: URL) async throws {
         guard !isLoadingModel else { return }
         
         isReady = false
@@ -82,29 +79,24 @@ class VoiceContext: ObservableObject {
             isLoadingModel = false
         }
         
-        // first load the kokoro-ios engine up with the model
-        tts = KokoroTTS(modelPath: modelSafetensors, g2p: .misaki)
-
-        // then load the voice directly from the safetensors file
-        let parsedSafetensors = try Safetensors.read(at: voiceSafetensors)
-        guard let tensorKey = parsedSafetensors.keys.first else {
-            throw VoiceError.noVoiceTensor
-        }
-        let shapedArray: MLShapedArray<Float> = try parsedSafetensors.mlShapedArray(forKey: tensorKey)
-        let scalars = shapedArray.scalars
-        
-        // scalars is 1d here, but we went the 3d shape kokoro expects
-        // while casting each dimension to an Int instead of Int32.
-        currentVoice = MLXArray(scalars).reshaped(shapedArray.shape.map { Int($0) })
-
+        // FIXME: current implementation tries to download things for the text processor
+        // and since I don't have network capability enabled, it just fails.
+        // so I disabled the text processor, which means there's no G2P pass so the
+        // TTS is more or less busted - though it technically does work using the new
+        // embedded library.
+        //
+        // It's an intentional decision to leave things broken like this and work on the
+        // MLX integration, as that is the whole point of this branch.
+        //
+        // new implementation
+        tts = try await KokoroModel.fromModelDirectory(modelDirectory)
         isReady = true
     }
     
     // loads the kokoro model safetensors file and the selected voice safetensors file
     // that is specified in the configuration object; throws an exception on error.
     func load(from config: TTSConfiguration) async throws {
-        guard let modelURL = try resolve(config.modelBookmark, fallback: config.modelPath),
-              let voiceURL = try resolve(config.voiceBookmark, fallback: config.voicePath) else {
+        guard let modelURL = try resolve(config.modelBookmark, fallback: config.modelDirectory) else {
             throw VoiceError.notReady
         }
         
@@ -114,12 +106,8 @@ class VoiceContext: ObservableObject {
             throw VoiceError.securityScopeFailed(modelURL.path)
         }
         
-        guard voiceURL.startAccessingSecurityScopedResource() else {
-            throw VoiceError.securityScopeFailed(voiceURL.path)
-        }
         currentModelURL = modelURL
-        currentVoiceURL = voiceURL
-        try await self.loadModelFiles(modelSafetensors: modelURL, voiceSafetensors: voiceURL)
+        try await self.loadModelFiles(modelDirectory: modelURL)
     }
     
     private func resolve(_ data: Data?, fallback: String) throws -> URL? {
@@ -143,21 +131,19 @@ class VoiceContext: ObservableObject {
         
     // does the TTS transformation of the supplied text String and then
     // plays the audio out.
-    func speak(text: String, config: TTSConfiguration, messageId: UUID?, lang: Language = .enUS) async throws {
-        // tag this particular messageId as the one we're speaking, if supplied with the UUID
-        speakingMessageID = messageId
-        defer { speakingMessageID = nil }
-
-        // if we haven't loaded the model yet, give that a shot
+    func speak(text: String, messageId: UUID?, config: TTSConfiguration) async throws {
+        // try loading first if we don't have an engine loaded
         if !isLoaded {
             try await load(from: config)
         }
         
-        guard isReady,
-              let tts = tts,
-              let voiceEmbedding = currentVoice else {
-            throw VoiceError.noVoiceTensor
+        // ensure we're good to go from this point.
+        guard isReady, let tts = tts else {
+            throw VoiceError.notReady
         }
+        
+        // tag this particular messageId as the one we're speaking, if supplied with the UUID
+        speakingMessageID = messageId
         
         // break the text string into 'paragraphs' by splitting at newlines and trimming
         let paragraphs = text.components(separatedBy: "\n")
@@ -171,15 +157,17 @@ class VoiceContext: ObservableObject {
 
             // too heavy of a compute for the main actor...
             let audio = try await Task.detached(priority: .utility) {
-                let result = try tts.generateAudio(
-                    voice: voiceEmbedding,
-                    language: lang,
-                    text: paragraph
-                ).0
+                let result = try await tts.generate(
+                    text: paragraph,
+                    voice: "af_heart",
+                    refAudio: nil,
+                    refText: nil,
+                    language: "en",
+                )
                 
                 // without clearing the cache, it would appear that memory stacks up
                 // until it will cause crashes on iOS.
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
                 
                 return result
             }.value
@@ -195,7 +183,10 @@ class VoiceContext: ObservableObject {
             if interruptRequested { break }
 
             speakingMessageID = messageId
-            try playBuffer(audio)
+
+            // hack to convert back to float array
+            let floatArray: [Float] = audio.asArray(Float.self)
+            try playBuffer(floatArray)
         }
         
         // final delay to wait until the last message is finished playing
@@ -258,7 +249,6 @@ class VoiceContext: ObservableObject {
     func unload() {
         stopPlaying()
         tts = nil
-        currentVoice = nil
         isReady = false
         isPlaying = false
         interruptRequested = true

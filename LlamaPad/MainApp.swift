@@ -30,10 +30,11 @@ struct MainApp: App {
                     appState.onGenerationFinished = { message in
                         if let config = appState.modelConfig, config.tts.autoPlayEnabled, config.tts.isEnabled {
                             Task {
+                                // FIXME: broke TTS
                                 try? await voiceContext.speak(
                                     text: message.parsedContent.responseContent,
-                                    config: config.tts,
-                                    messageId: message.id
+                                    messageId: message.id,
+                                    config: config.tts
                                 )
                             }
                         }

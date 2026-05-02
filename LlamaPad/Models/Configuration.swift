@@ -3,10 +3,8 @@ import SwiftUI
 
 struct TTSConfiguration: Codable {
     var isEnabled: Bool = false
-    var modelPath: String = ""
+    var modelDirectory: String = ""
     var modelBookmark: Data? = nil
-    var voicePath: String = ""
-    var voiceBookmark: Data? = nil
     var autoPlayEnabled: Bool = false
 }
 

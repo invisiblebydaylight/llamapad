@@ -3,7 +3,6 @@ import UniformTypeIdentifiers
 
 enum TTSPickerTarget {
     case model
-    case voice
 }
 
 struct TTSConfigTab: View {
@@ -36,12 +35,12 @@ struct TTSConfigTab: View {
                         
                         Spacer()
                         
-                        if draftConfig.tts.modelPath.isEmpty {
-                            Text("Safetensors File Required...")
+                        if draftConfig.tts.modelDirectory.isEmpty {
+                            Text("Kokoro Folder Required...")
                                 .foregroundColor(Color(.systemRed))
                                 .italic()
                         } else {
-                            Text(URL(fileURLWithPath: draftConfig.tts.modelPath).lastPathComponent)
+                            Text(URL(fileURLWithPath: draftConfig.tts.modelDirectory).lastPathComponent)
                                 .foregroundColor(.primary)
                         }
                         
@@ -62,21 +61,8 @@ struct TTSConfigTab: View {
                         
                         Spacer()
                         
-                        if draftConfig.tts.voicePath.isEmpty {
-                            Text("Safetensors File Required...")
-                                .foregroundColor(Color(.systemRed))
-                                .italic()
-                        } else {
-                            Text(URL(fileURLWithPath: draftConfig.tts.voicePath).lastPathComponent)
-                                .foregroundColor(.primary)
-                        }
-                        
-                        Button("Browse...") {
-                            pickerTarget = .voice
-                            showingFilePicker = true
-                        }
-                        .buttonStyle(.bordered)
-                        .fixedSize()
+                        // FIXME: TTS voice selection
+                        Text("Disabled...")
                     }
                 }
                 .disabled(!draftConfig.tts.isEnabled)
@@ -87,7 +73,7 @@ struct TTSConfigTab: View {
         .scrollContentBackground(.hidden)
         .fileImporter(
             isPresented: $showingFilePicker,
-            allowedContentTypes: [UTType(filenameExtension: "safetensors", conformingTo: .data) ?? .data],
+            allowedContentTypes: [.folder],
             allowsMultipleSelection: false
         ) { result in
             handleFileSelection(result)
@@ -121,11 +107,8 @@ struct TTSConfigTab: View {
                 
                 switch pickerTarget {
                 case .model:
-                    draftConfig.tts.modelPath = url.path
+                    draftConfig.tts.modelDirectory = url.path
                     draftConfig.tts.modelBookmark = bookmarkData
-                case .voice:
-                    draftConfig.tts.voicePath = url.path
-                    draftConfig.tts.voiceBookmark = bookmarkData
                 }
             } catch {
                 errorMessage = "Failed to create the bookmark: \(error)"
