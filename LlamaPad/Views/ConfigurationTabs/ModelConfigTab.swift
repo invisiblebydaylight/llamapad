@@ -16,6 +16,26 @@ struct ModelConfigTab: View {
     var body: some View {
         Form {
             Section("Model") {
+                HStack {
+                    Text("Backend")
+                    Spacer()
+                    Picker("", selection: Binding<InferenceBackendType>(
+                        get: { draftConfig.backendType },
+                        set: { newValue in
+                            DispatchQueue.main.async {
+                                draftConfig.backendType = newValue
+                                draftConfig.modelPaths.removeAll()
+                                draftConfig.modelBookmarks.removeAll()
+                            }
+                        }
+                    )) {
+                        ForEach(InferenceBackendType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+             
                 VStack {
                     HStack {
                         Text("Model File")

@@ -103,7 +103,11 @@ class AppState: ObservableObject {
         }
 
         // spawn the correct concrete backend
-        let newBackend: InferenceBackend = LlamaBackend()
+        //let newBackend: InferenceBackend = LlamaBackend()
+        
+        //FIXME: This is gonna be busted, but this is where we hook the MLX backend up for testing
+        let newBackend: InferenceBackend = MLXBackend()
+        
         do {
             try await newBackend.load(from: config)
             self.backend = newBackend

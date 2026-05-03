@@ -7,19 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */ = {isa = PBXBuildFile; productRef = 1C199C6D2F2AA107009EB2D0 /* Jinja */; };
 		1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F8F2EFC54A5004893BF /* Metal.framework */; };
 		1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F942EFC54AE004893BF /* Accelerate.framework */; };
 		1C36EB132F0DB92700E0F1A6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C36EB122F0DB92700E0F1A6 /* AppIcon.icon */; };
-		1C3C8B0F2F47D0DE00432D4D /* Safetensors in Frameworks */ = {isa = PBXBuildFile; productRef = 1C3C8B0E2F47D0DE00432D4D /* Safetensors */; };
 		1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; };
 		1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1C437B6E2EB1B12A000E4236 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 1C437B6D2EB1B12A000E4236 /* README.md */; };
 		1C5D6BD52FA4EEBA00B27F77 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BD42FA4EEBA00B27F77 /* MLXAudioCore */; };
 		1C5D6BD72FA4EEBA00B27F77 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BD62FA4EEBA00B27F77 /* MLXAudioTTS */; };
-		1C5D6BDA2FA4F00700B27F77 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BD92FA4F00700B27F77 /* MLXLLM */; };
-		1C5D6BDC2FA4F00700B27F77 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BDB2FA4F00700B27F77 /* MLXLMCommon */; };
 		1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */ = {isa = PBXBuildFile; productRef = 1C72F3032F3125BF0009D925 /* MarkdownView */; };
+		1C8A55762FA6792B000BA27C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A55752FA6792B000BA27C /* MLXLLM */; };
+		1C8A55782FA6792B000BA27C /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A55772FA6792B000BA27C /* MLXLMCommon */; };
+		1C8A55872FA6AD8E000BA27C /* Jinja in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A55862FA6AD8E000BA27C /* Jinja */; };
+		1C8A558A2FA6ADE0000BA27C /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A55892FA6ADE0000BA27C /* Tokenizers */; };
+		1C8A558D2FA6AED7000BA27C /* MLXLMTransformers in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A558C2FA6AED7000BA27C /* MLXLMTransformers */; };
 		1C8FF5812EF0CF3000F7F4A2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 1C8FF5802EF0CF3000F7F4A2 /* LICENSE */; };
 /* End PBXBuildFile section */
 
@@ -73,14 +74,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1C5D6BDC2FA4F00700B27F77 /* MLXLMCommon in Frameworks */,
-				1C5D6BDA2FA4F00700B27F77 /* MLXLLM in Frameworks */,
+				1C8A55782FA6792B000BA27C /* MLXLMCommon in Frameworks */,
+				1C8A558D2FA6AED7000BA27C /* MLXLMTransformers in Frameworks */,
+				1C8A55762FA6792B000BA27C /* MLXLLM in Frameworks */,
 				1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */,
 				1C5D6BD72FA4EEBA00B27F77 /* MLXAudioTTS in Frameworks */,
-				1C199C6E2F2AA107009EB2D0 /* Jinja in Frameworks */,
+				1C8A558A2FA6ADE0000BA27C /* Tokenizers in Frameworks */,
 				1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */,
-				1C3C8B0F2F47D0DE00432D4D /* Safetensors in Frameworks */,
 				1C5D6BD52FA4EEBA00B27F77 /* MLXAudioCore in Frameworks */,
+				1C8A55872FA6AD8E000BA27C /* Jinja in Frameworks */,
 				1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */,
 				1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */,
 			);
@@ -140,13 +142,14 @@
 			);
 			name = LlamaPad;
 			packageProductDependencies = (
-				1C199C6D2F2AA107009EB2D0 /* Jinja */,
 				1C72F3032F3125BF0009D925 /* MarkdownView */,
-				1C3C8B0E2F47D0DE00432D4D /* Safetensors */,
 				1C5D6BD42FA4EEBA00B27F77 /* MLXAudioCore */,
 				1C5D6BD62FA4EEBA00B27F77 /* MLXAudioTTS */,
-				1C5D6BD92FA4F00700B27F77 /* MLXLLM */,
-				1C5D6BDB2FA4F00700B27F77 /* MLXLMCommon */,
+				1C8A55752FA6792B000BA27C /* MLXLLM */,
+				1C8A55772FA6792B000BA27C /* MLXLMCommon */,
+				1C8A55862FA6AD8E000BA27C /* Jinja */,
+				1C8A55892FA6ADE0000BA27C /* Tokenizers */,
+				1C8A558C2FA6AED7000BA27C /* MLXLMTransformers */,
 			);
 			productName = LlamaPad;
 			productReference = 1C818A932EAEBB8400D864C9 /* LlamaPad.app */;
@@ -177,11 +180,12 @@
 			mainGroup = 1C818A8A2EAEBB8400D864C9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */,
 				1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */,
-				1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */,
 				1C5D6BD32FA4EEBA00B27F77 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
-				1C5D6BD82FA4F00700B27F77 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				1C8A55742FA6792B000BA27C /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				1C8A55852FA6AD8E000BA27C /* XCRemoteSwiftPackageReference "swift-jinja" */,
+				1C8A55882FA6ADE0000BA27C /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				1C8A558B2FA6AED7000BA27C /* XCRemoteSwiftPackageReference "swift-transformers-mlx" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C818A942EAEBB8400D864C9 /* Products */;
@@ -386,6 +390,7 @@
 				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -452,6 +457,7 @@
 				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -493,36 +499,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/huggingface/swift-jinja.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.3.1;
-			};
-		};
-		1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/jkrukowski/swift-safetensors";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.1;
-			};
-		};
 		1C5D6BD32FA4EEBA00B27F77 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Blaizzy/mlx-audio-swift.git";
 			requirement = {
 				branch = main;
 				kind = branch;
-			};
-		};
-		1C5D6BD82FA4F00700B27F77 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.31.3;
 			};
 		};
 		1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
@@ -533,19 +515,43 @@
 				minimumVersion = 2.6.0;
 			};
 		};
+		1C8A55742FA6792B000BA27C /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.31.3;
+			};
+		};
+		1C8A55852FA6AD8E000BA27C /* XCRemoteSwiftPackageReference "swift-jinja" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-jinja.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.5;
+			};
+		};
+		1C8A55882FA6ADE0000BA27C /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+			traits = (
+			);
+		};
+		1C8A558B2FA6AED7000BA27C /* XCRemoteSwiftPackageReference "swift-transformers-mlx" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/DePasqualeOrg/swift-transformers-mlx";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		1C199C6D2F2AA107009EB2D0 /* Jinja */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1C199C6C2F2AA107009EB2D0 /* XCRemoteSwiftPackageReference "swift-jinja" */;
-			productName = Jinja;
-		};
-		1C3C8B0E2F47D0DE00432D4D /* Safetensors */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1C3C8B0D2F47D0DE00432D4D /* XCRemoteSwiftPackageReference "swift-safetensors" */;
-			productName = Safetensors;
-		};
 		1C5D6BD42FA4EEBA00B27F77 /* MLXAudioCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1C5D6BD32FA4EEBA00B27F77 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
@@ -556,20 +562,35 @@
 			package = 1C5D6BD32FA4EEBA00B27F77 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
 			productName = MLXAudioTTS;
 		};
-		1C5D6BD92FA4F00700B27F77 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1C5D6BD82FA4F00700B27F77 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
-			productName = MLXLLM;
-		};
-		1C5D6BDB2FA4F00700B27F77 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1C5D6BD82FA4F00700B27F77 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
-			productName = MLXLMCommon;
-		};
 		1C72F3032F3125BF0009D925 /* MarkdownView */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1C72F3022F3125BF0009D925 /* XCRemoteSwiftPackageReference "MarkdownView" */;
 			productName = MarkdownView;
+		};
+		1C8A55752FA6792B000BA27C /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A55742FA6792B000BA27C /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		1C8A55772FA6792B000BA27C /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A55742FA6792B000BA27C /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+		1C8A55862FA6AD8E000BA27C /* Jinja */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A55852FA6AD8E000BA27C /* XCRemoteSwiftPackageReference "swift-jinja" */;
+			productName = Jinja;
+		};
+		1C8A55892FA6ADE0000BA27C /* Tokenizers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A55882FA6ADE0000BA27C /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Tokenizers;
+		};
+		1C8A558C2FA6AED7000BA27C /* MLXLMTransformers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A558B2FA6AED7000BA27C /* XCRemoteSwiftPackageReference "swift-transformers-mlx" */;
+			productName = MLXLMTransformers;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

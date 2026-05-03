@@ -1,6 +1,12 @@
 import Combine
 import SwiftUI
 
+enum InferenceBackendType: String, Codable, CaseIterable {
+    case llamaCPP = "llama.cpp"
+    case mlx = "mlx"
+    // case remoteAPI = "api"  // future
+}
+
 struct TTSConfiguration: Codable {
     var isEnabled: Bool = false
     var modelDirectory: String = ""
@@ -9,6 +15,7 @@ struct TTSConfiguration: Codable {
 }
 
 class AppConfiguration: ObservableObject, Codable {
+    @Published var backendType: InferenceBackendType = .llamaCPP
     @Published var modelPaths: [String] = []
     @Published var modelBookmarks: [Data] = []
     @Published var chatTemplate: String? = nil
@@ -23,7 +30,7 @@ class AppConfiguration: ObservableObject, Codable {
     @Published var tts: TTSConfiguration = TTSConfiguration()
 
     enum CodingKeys: String, CodingKey {
-        case modelPaths, modelBookmarks, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
+        case backendType, modelPaths, modelBookmarks, chatTemplate, enableThinking, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
     }
 
     init() {}
@@ -42,6 +49,7 @@ class AppConfiguration: ObservableObject, Codable {
     required convenience init(from decoder: Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        backendType = try container.decodeIfPresent(InferenceBackendType.self, forKey: .backendType) ?? .llamaCPP
         modelPaths = try container.decode([String].self, forKey: .modelPaths)
         modelBookmarks = try container.decode([Data].self, forKey: .modelBookmarks)
         chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
@@ -58,6 +66,7 @@ class AppConfiguration: ObservableObject, Codable {
     
     // deep copy initializer
     init(_ other: AppConfiguration) {
+        self.backendType = other.backendType
         self.modelPaths = other.modelPaths
         self.modelBookmarks = other.modelBookmarks
         self.chatTemplate = other.chatTemplate
@@ -74,6 +83,7 @@ class AppConfiguration: ObservableObject, Codable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(backendType, forKey: .backendType)
         try container.encode(modelPaths, forKey: .modelPaths)
         try container.encode(modelBookmarks, forKey: .modelBookmarks)
         try container.encode(chatTemplate, forKey: .chatTemplate)

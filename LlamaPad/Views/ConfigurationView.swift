@@ -83,8 +83,10 @@ struct ConfigurationView: View {
             }
             .fileImporter(
                 isPresented: $showingFilePicker,
-                allowedContentTypes: [UTType(filenameExtension: "gguf", conformingTo: .data) ?? .data],
-                allowsMultipleSelection: true
+                allowedContentTypes: draftConfig.backendType == .mlx
+                    ? [.folder]
+                    : [UTType(filenameExtension: "gguf", conformingTo: .data) ?? .data],
+                allowsMultipleSelection: draftConfig.backendType == .mlx ? false : true
             ) { result in
                 handleModelSelect(result)
             }

@@ -11,7 +11,7 @@ struct MainApp: App {
     init() {
         // put a leash on the MLX cache as it has a tendency
         // to run wild and allow the app to OOM and crash.
-        GPU.set(cacheLimit: 100 * 1024 * 1024)
+        Memory.cacheLimit = 100 * 1024 * 1024
  
         initializeLlamaCppBackend()
     }
