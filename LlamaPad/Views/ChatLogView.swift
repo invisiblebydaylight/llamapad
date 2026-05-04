@@ -56,6 +56,15 @@ struct ChatLogView: View {
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                         }
+                                    } else if pct < 0.1 {
+                                        VStack(spacing: 8) {
+                                            ProgressView()
+                                                .progressViewStyle(.circular)
+                                                .padding(.top, 8)
+                                            Text(status)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                     Spacer()
                                 }

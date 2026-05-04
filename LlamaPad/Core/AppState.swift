@@ -103,10 +103,11 @@ class AppState: ObservableObject {
         }
 
         // spawn the correct concrete backend
-        //let newBackend: InferenceBackend = LlamaBackend()
-        
-        //FIXME: This is gonna be busted, but this is where we hook the MLX backend up for testing
-        let newBackend: InferenceBackend = MLXBackend()
+        let newBackend: InferenceBackend = if config.backendType == .llamaCPP {
+            LlamaBackend()
+        } else {
+            MLXBackend()
+        }
         
         do {
             try await newBackend.load(from: config)
@@ -294,6 +295,7 @@ class AppState: ObservableObject {
             // generate tokens and update UI incrementally
             self.reportProcessStatus(progress: nil, status: nil)
             
+            var reportedProgress = 0.0
             for try await chunk in stream {
                 // if something has set our 'shouldStopGenerating' flag, this will be the
                 // point at which we bail out of the prediction stream. upstream (hah!)
@@ -304,15 +306,26 @@ class AppState: ObservableObject {
                 
                 if chunk.isPromptProcessing {
                     actualTokensProcessed = chunk.tokensDecoded
-                    self.reportProcessStatus(progress: chunk.promptProgress,
+                    reportedProgress = chunk.promptProgress
+                    self.reportProcessStatus(progress: reportedProgress,
                                              status: "Processing prompt...")
                 } else {
-                    aiMessage.content.append(chunk.text)
-                    generatedTokens = chunk.tokensGenerated
+                    if !chunk.text.isEmpty {
+                        aiMessage.content.append(chunk.text)
+                        generatedTokens = chunk.tokensGenerated
                     
-                    // do some special tracking for the first token
-                    if generatedTokens == 1 {
-                        timeToFirstToken = DispatchTime.now().uptimeNanoseconds
+                        // do some special tracking for the first token
+                        if generatedTokens == 1 {
+                            self.reportProcessStatus(progress: 1.0, status: nil)
+                            reportedProgress = 1.0
+                            timeToFirstToken = DispatchTime.now().uptimeNanoseconds
+                        }
+                    }
+
+                    // for the MLX backend, we sometimes send blank strings
+                    // with updated counts that aren't 0
+                    if chunk.tokensDecoded > 0 {
+                        actualTokensProcessed = chunk.tokensDecoded
                     }
                 }
             }

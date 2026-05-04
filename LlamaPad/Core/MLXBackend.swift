@@ -8,10 +8,11 @@ import MLXLMTransformers
 class MLXBackend: InferenceBackend {
     private var loadedConfig: AppConfiguration?
     private var loadedModel: ModelContainer?
+    private var internalLastPromptTokenCount: Int? = nil
     
     var isLoaded: Bool { loadedModel != nil }
     var contextLimit: Int = 0
-    var lastPromptTokenCount: Int? = nil
+    var lastPromptTokenCount: Int? { internalLastPromptTokenCount }
     
     func load(from config: AppConfiguration) async throws {
         // attempt to use the stored security scoped bookmark if one
@@ -109,6 +110,7 @@ class MLXBackend: InferenceBackend {
 
             // use our stored sampler settings
             var generateParameters = GenerateParameters(maxTokens: loadedConfig?.maxGenerationLength,
+                                                        maxKVSize: loadedConfig?.contextLength,
                                                         temperature: loadedConfig?.customSampler.temperature ?? 0.6,
                                                         topP: loadedConfig?.customSampler.topP ?? 1.0,
                                                         topK: Int(loadedConfig?.customSampler.topK ?? 0),
@@ -126,11 +128,12 @@ class MLXBackend: InferenceBackend {
             let session = ChatSession(model,
                                       instructions: systemMessage,
                                       history: mlxMessages,
-                                      generateParameters: generateParameters)
+                                      generateParameters: generateParameters,
+                                      additionalContext: ["enable_thinking" : loadedConfig?.enableThinking ?? false])
 
             // This returns AsyncThrowingStream<String, Error>
             // but we need it to be AsyncThrowingStream<GenerationChunk, Error> ...
-            let mlxStream = session.streamResponse(to: targetMsg?.parsedContent.responseContent ??
+            let mlxStream = session.streamDetails(to: targetMsg?.parsedContent.responseContent ??
                                                    "Tell the user the software they use is bugged because the AI cannot see the message to respond to.",
                                                    images: [], videos: [])
             
@@ -139,17 +142,38 @@ class MLXBackend: InferenceBackend {
                 let task = Task {
                     do {
                         var tokensGenerated = 0
-                    
-                        for try await chunk in mlxStream {
+                        
+                        continuation.yield(GenerationChunk(
+                            text: "",
+                            isPromptProcessing: true,
+                            promptProgress: 0,  // 0 = "we don't know the percentage"
+                            tokensDecoded: 0,
+                            tokensGenerated: 0
+                        ))
+
+                        for try await gen in mlxStream {
                             if Task.isCancelled { break }
-                            tokensGenerated += 1
-                            continuation.yield(GenerationChunk(
-                                text: chunk,
-                                isPromptProcessing: false,
-                                promptProgress: 0,
-                                tokensDecoded: 0,
-                                tokensGenerated: tokensGenerated
-                            ))
+                            // if we got a chunk of text generated, send it
+                            if let chunk = gen.chunk {
+                                tokensGenerated += 1
+                                continuation.yield(GenerationChunk(
+                                    text: chunk,
+                                    isPromptProcessing: false,
+                                    promptProgress: 0,
+                                    tokensDecoded: 0,
+                                    tokensGenerated: tokensGenerated
+                                ))
+                            }
+                            if let info = gen.info {
+                                internalLastPromptTokenCount = info.promptTokenCount
+                                continuation.yield(GenerationChunk(
+                                    text: "",
+                                    isPromptProcessing: false,
+                                    promptProgress: 1.0,
+                                    tokensDecoded: info.promptTokenCount,
+                                    tokensGenerated: info.generationTokenCount
+                                ))
+                            }
                         }
                         
                         continuation.finish()

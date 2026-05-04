@@ -1,7 +1,8 @@
 # llamapad (v0.2.2)
 
 A native MacOS and iOS chat application for local LLM inference, built on top of  
-[llama.cpp](https://github.com/ggml-org/llama.cpp/). Everything runs on-device.
+[llama.cpp](https://github.com/ggml-org/llama.cpp/) and
+[mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device.
 Nothing is sent to the cloud. The app is sandboxed and has only read-only access
 to just the files you select in the configuration; no network access or mic input.
 
@@ -38,8 +39,8 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ## Features
-* Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native on-device text generation.
-  **Nothing is sent to the cloud.**
+* Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native text generation.
+* Embedded [MLX](https://github.com/ml-explore/mlx-swift-lm) library for native Apple Silicon support.
 * AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
 * Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
@@ -49,6 +50,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
+* Support for MLX models has landed! It might still be rough around the edges as it's a new backend.
 * Performance metrics are now recorded for each message and shown on mouse hover (MacOS) or swipe (iOS).
 * Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.
 * Lazy-loading the model is now supported. LLMs no longer load automatically on application startup. A Load/Eject
