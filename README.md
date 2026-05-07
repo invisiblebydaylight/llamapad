@@ -1,10 +1,10 @@
-# llamapad (v0.2.2)
+# llamapad (v0.3.0)
 
 A native MacOS and iOS chat application for local LLM inference, built on top of  
 [llama.cpp](https://github.com/ggml-org/llama.cpp/) and
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device.
-Nothing is sent to the cloud. The app is sandboxed and has only read-only access
-to just the files you select in the configuration; no network access or mic input.
+Nothing is sent to the cloud. The app is sandboxed with only read-only access
+to the files you select. No network access, no microphone.
 
 Features conversation management, Jinja template support, text-to-speech
 and a privacy-first design philosophy.
@@ -50,17 +50,16 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
-* Support for MLX models has landed! It might still be rough around the edges as it's a new backend.
-* Performance metrics are now recorded for each message and shown on mouse hover (MacOS) or swipe (iOS).
+* Support for MLX models has landed! It might still be rough around the edges as it's a new backend. To support having a new backend implementation, a common protocol has been developed and utilized.
+* Performance metrics are now recorded for each message and shown on mouse hover (macOS) or swipe (iOS).
 * Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.
 * Lazy-loading the model is now supported. LLMs no longer load automatically on application startup. A Load/Eject
   button has been added next to the config button to manually control the behavior, otherwise the configured
   model is loaded when the user sends a message, generates a response or regenerates an existing one.
 * KV cache quantization now supported and settings can be found in the 'Advanced' group of the Model config tab.
 * Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
-  [kokoro-ios](https://github.com/mlalma/kokoro-ios) library. This uses an embedded 
-  [MisakiSwift](https://github.com/mlalma/MisakiSwift) Grapheme-to-Phoneme engine and should be 
-  self-contained, though languages other than English might not be supported well.
+  [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library. Note: support for the G2P pass 
+  is currently broken, and it will not sound great.
 * Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
   for prompt construction if possible; still can override to built-in templates from llama.cpp...
 * Conversations can be created, renamed, duplicated and deleted.
@@ -98,7 +97,7 @@ and runs on the target device.
   you'll get errors when trying to use TTS and the error message will have a coreaudio exception.
   There are currently no guard rails on what size models you can load; with great power
   comes great responsibility.
-  
+
 
 ## Future Goals
 
@@ -109,7 +108,7 @@ a more robust experience:
 * Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
 * Paralizable, batched requests that might be useful for behind-the-scenes agent stuff.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
-* Maybe even more inventive things like visualizing token logits at each step for illustration purpposes
+* Maybe even more inventive things like visualizing token logits at each step for illustration purposes
   or memory systems.
 
 
@@ -129,9 +128,8 @@ keep a simple focus on just providing AI chatting functionality.
 * [llama.cpp](https://github.com/ggml-org/llama.cpp/) is used as the primary AI inference engine.
 * [swift-jinja](https://github.com/huggingface/swift-jinja) is used as the embedded Jinja parser.
 * [MarkdownView](https://github.com/LiYanan2004/MarkdownView.git) to render chat as markdown.
-* [kokoro-ios](https://github.com/mlalma/kokoro-ios) is used for text-to-speech synthesis.
-* [mlx-swift](https://github.com/ml-explore/mlx-swift.git) for MLX features used primarily in TTS support at present.
-* [swift-safetensors](https://github.com/jkrukowski/swift-safetensors) to load `.safetensors` files.
+* [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) is used for text-to-speech synthesis.
+* [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm) for MLX language model support.
 
 
 ## Implementation Notes
@@ -141,10 +139,11 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
 - The `reservedContextBuffer` defines the minimum headroom kept for AI generation and thinking.
 - When the context usage exceeds `contextLength - reservedContextBuffer`, the window "slides" forward.
 - **The Runway Effect:** To prevent frequent, costly prompt re-ingestion, the window doesn't just slide by one message; it slides far enough to create a "runway" equal to the `contextRunway` amount. This means you will see a significant drop in context usage when the anchor moves (`reservedContextBuffer` + contextRunway), providing space for several turns of uninterrupted discourse.
+- MLX context handling differs from llama.cpp. While the llama.cpp backend uses an anchored window with runway to minimize KV cache regeneration, the MLX backend only truncates older mesages to fit and re-ingests the entire promopt on each generation.
 
-### iOS and MacOS
+### iOS and macOS
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
-* The configuration and chatlog are saved in the app's application support directory on MacOS, is something like: 
+* The configuration and chatlog are saved in the app's application support directory on macOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
 * Kokoro-ios is pinned to 1.0.10 because upgrading to 1.0.11 broke audio on iOS targets
   (https://github.com/mlalma/KokoroTestApp/issues/7).

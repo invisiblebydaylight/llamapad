@@ -35,7 +35,7 @@ class AppState: ObservableObject {
     @Published var processingProgress: Double? = nil
     
     /// describes the current processing task (e.g. "Processing Prompt...")
-    @Published var processingStatus: String? = nil
+    @Published var processingStatus: String? = nil  
 
     /// a callback that gets called on completion, if supplied, with the new message that was generated.
     /// this callback is skipped if the generation is cancled by the user with `shouldStopGenerating`

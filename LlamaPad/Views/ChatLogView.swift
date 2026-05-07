@@ -37,7 +37,7 @@ struct ChatLogView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(messages) { message in
                                 MessageView(appState: appState, message: message).id(message.id)
                             }
@@ -72,10 +72,12 @@ struct ChatLogView: View {
                             
                             // give some space for the scrolling to go past the last message
                             Spacer(minLength: 200)
-                                .id("bottom-spacer")
                         }
                     }
                 }
+            }
+            .onChange(of: appState.currentConversationID) { _, _ in
+                lastScrollCount = 0
             }
             .onChange(of: messages.count) { _, _ in
                 scrollToBottom(proxy: proxy)
@@ -96,11 +98,11 @@ struct ChatLogView: View {
         
         scrollTask?.cancel()
         scrollTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            await Task.yield()
             if Task.isCancelled { return }
             
-            withAnimation(.easeIn(duration: 0.25)) {
-                proxy.scrollTo("bottom-spacer", anchor: .bottom)
+            if let lastId = messages.last?.id {
+                proxy.scrollTo(lastId, anchor: .bottom)
             }
         
             lastScrollCount = currentCount

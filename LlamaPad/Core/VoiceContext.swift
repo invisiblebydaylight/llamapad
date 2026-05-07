@@ -2,7 +2,6 @@ import MLX
 import CoreML
 import AVFoundation
 import Combine
-import Safetensors
 import MLXAudioTTS
 
 enum VoiceError: LocalizedError {

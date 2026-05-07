@@ -6,7 +6,7 @@ struct ModelConfigTab: View {
     @Binding var showingFilePicker: Bool
     
     @State private var isAdvSamplerExpanded = false
-    private let templateNames: [String] = getBuiltinTemplateNames()
+    private let templateNames: [String] = LlamaBackend.BuiltinTemplateNames
     
     private var modelFilename: String {
         guard !draftConfig.modelPaths.isEmpty else { return "No model selected" }
@@ -14,6 +14,7 @@ struct ModelConfigTab: View {
     }
 
     var body: some View {
+        let backend = draftConfig.backendType
         Form {
             Section("Model") {
                 HStack {
@@ -43,7 +44,7 @@ struct ModelConfigTab: View {
                         Spacer()
                         
                         if draftConfig.modelPaths.isEmpty {
-                            Text("GGUF File Required...")
+                            Text(backend == .llamaCPP ? "GGUF File(s) Required..." : "MLX Model Directory...")
                                 .foregroundColor(Color(.systemRed))
                                 .italic()
                         } else {
@@ -67,14 +68,16 @@ struct ModelConfigTab: View {
                     }
                 }
                 
-                HStack {
-                    Text("Layers To Offload")
-                    TextField("", value: $draftConfig.layerCountToOffload, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.layerCountToOffload, in: 0...200, step: 1)
-                        .labelsHidden()
+                if backend == .llamaCPP {
+                    HStack {
+                        Text("Layers To Offload")
+                        TextField("", value: $draftConfig.layerCountToOffload, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.layerCountToOffload, in: 0...200, step: 1)
+                            .labelsHidden()
+                    }
                 }
-                
+
                 HStack {
                     Text("Context Length")
                     TextField("", value: $draftConfig.contextLength, format: .number)
@@ -87,24 +90,26 @@ struct ModelConfigTab: View {
                     Text("Max Generation Length")
                     TextField("", value: $draftConfig.maxGenerationLength, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.maxGenerationLength, in: 64...(64*1024), step: 64)
+                    Stepper("", value: $draftConfig.maxGenerationLength, in: 0...(64*1024), step: 128)
                         .labelsHidden()
                 }
                 
-                HStack {
-                    Text("Chat Template")
-                    Picker("", selection: Binding<String>(
-                        get: { draftConfig.chatTemplate ?? "None" },
-                        set: { newValue in
-                            draftConfig.chatTemplate = (newValue == "None") ? nil : newValue
+                if backend == .llamaCPP {
+                    HStack {
+                        Text("Chat Template")
+                        Picker("", selection: Binding<String>(
+                            get: { draftConfig.chatTemplate ?? "None" },
+                            set: { newValue in
+                                draftConfig.chatTemplate = (newValue == "None") ? nil : newValue
+                            }
+                        )) {
+                            Text("Jinja / Autodetect").tag("None")
+                            ForEach(templateNames, id: \.self) { name in
+                                Text(name).tag(name)
+                            }
                         }
-                    )) {
-                        Text("Jinja / Autodetect").tag("None")
-                        ForEach(templateNames, id: \.self) { name in
-                            Text(name).tag(name)
-                        }
+                        .pickerStyle(.menu)  // Makes it compact and native
                     }
-                    .pickerStyle(.menu)  // Makes it compact and native
                 }
                 
                 HStack {
@@ -177,33 +182,35 @@ struct ModelConfigTab: View {
                     Stepper("", value: $draftConfig.customSampler.freqPenalty, in: -2.0...2.0, step: 0.1)
                         .labelsHidden()
                 }
-                HStack {
-                    Text("DRY Multiplier")
-                    TextField("", value: $draftConfig.customSampler.dryMultiplier, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.dryMultiplier, in: 0.0...2.0, step: 0.1)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("XTC Probability")
-                    TextField("", value: $draftConfig.customSampler.xtcProbability, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.xtcProbability, in: 0.0...1.0, step: 0.01)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("XTC Threshold")
-                    TextField("", value: $draftConfig.customSampler.xtcThreshold, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.xtcThreshold, in: 0.0...0.5, step: 0.01)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("XTC Minimum Kept")
-                    TextField("", value: $draftConfig.customSampler.xtcMinKeep, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.xtcMinKeep, in: 0...10, step: 1)
-                        .labelsHidden()
+                if backend == .llamaCPP {
+                    HStack {
+                        Text("DRY Multiplier")
+                        TextField("", value: $draftConfig.customSampler.dryMultiplier, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.customSampler.dryMultiplier, in: 0.0...2.0, step: 0.1)
+                            .labelsHidden()
+                    }
+                    HStack {
+                        Text("XTC Probability")
+                        TextField("", value: $draftConfig.customSampler.xtcProbability, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.customSampler.xtcProbability, in: 0.0...1.0, step: 0.01)
+                            .labelsHidden()
+                    }
+                    HStack {
+                        Text("XTC Threshold")
+                        TextField("", value: $draftConfig.customSampler.xtcThreshold, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.customSampler.xtcThreshold, in: 0.0...0.5, step: 0.01)
+                            .labelsHidden()
+                    }
+                    HStack {
+                        Text("XTC Minimum Kept")
+                        TextField("", value: $draftConfig.customSampler.xtcMinKeep, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.customSampler.xtcMinKeep, in: 0...10, step: 1)
+                            .labelsHidden()
+                    }
                 }
                 HStack {
                     Text("Magic Seed")
@@ -218,23 +225,29 @@ struct ModelConfigTab: View {
                         .multilineTextAlignment(.trailing)
                     Stepper("", value: $draftConfig.reservedContextBuffer, in: 128...4096, step: 128)
                         .labelsHidden()
+                        .opacity(draftConfig.maxGenerationLength > 0 ? 0.5 : 1.0)
+                        .disabled(draftConfig.maxGenerationLength > 0) // only is effective if no max generation length set
                 }
-                HStack {
-                    Text("Context Runway")
-                    TextField("", value: $draftConfig.contextRunway, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
-                        .labelsHidden()
+                if backend == .llamaCPP {
+                    HStack {
+                        Text("Context Runway")
+                        TextField("", value: $draftConfig.contextRunway, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
+                            .labelsHidden()
+                    }
                 }
                 
-                HStack {
-                    Text("KV Cache Type")
-                    Spacer()
-                    Picker("", selection: $draftConfig.kvCacheType) {
-                        ForEach(KVCacheType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
-                        }
-                    }.pickerStyle(.menu)
+                if backend == .llamaCPP {
+                    HStack {
+                        Text("KV Cache Type")
+                        Spacer()
+                        Picker("", selection: $draftConfig.kvCacheType) {
+                            ForEach(KVCacheType.allCases, id: \.self) { type in
+                                Text(type.rawValue).tag(type)
+                            }
+                        }.pickerStyle(.menu)
+                    }
                 }
              
                 // Reset Advanced button

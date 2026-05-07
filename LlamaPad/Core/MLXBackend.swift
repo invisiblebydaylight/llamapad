@@ -209,7 +209,10 @@ class MLXBackend: InferenceBackend {
         guard loadedModel != nil else { return messages }
         
         let effectiveContext = config.contextLength
-        let safetyThreshold = effectiveContext - config.reservedContextBuffer
+        let generationBudget = config.maxGenerationLength > 0
+            ? config.maxGenerationLength
+            : config.reservedContextBuffer
+        let safetyThreshold = effectiveContext - generationBudget
         
         // Tokenize system message to reserve its budget
         var totalTokens = 0

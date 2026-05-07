@@ -4,6 +4,9 @@ import MLX
 
 @MainActor
 class LlamaBackend : InferenceBackend {
+    // build the list of built-in template names from llama.cpp
+    static let BuiltinTemplateNames: [String] = getBuiltinTemplateNames()
+
     /// keeps track of the loaded LLM and its context
     var llamaContext: LlamaContext?
 
