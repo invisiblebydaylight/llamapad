@@ -82,6 +82,7 @@ class AppState: ObservableObject {
     
     // updates the inernal processing progress of a long operation (e.g. prompt processing)
     func reportProcessStatus(progress: Double?, status: String?) {
+        guard self.processingProgress != progress || self.processingStatus != status else { return }
         self.processingProgress = progress
         self.processingStatus = status
     }

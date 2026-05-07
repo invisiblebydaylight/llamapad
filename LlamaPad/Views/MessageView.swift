@@ -88,8 +88,9 @@ extension View {
 
 /// This view represents a single `Message` to render in the chatlog view.
 struct MessageView: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     @ObservedObject var message: Message
+    let isTTSEnabled: Bool
     
     /// used to provice text-to-speech features
     @EnvironmentObject var voiceContext: VoiceContext
@@ -114,10 +115,10 @@ struct MessageView: View {
     
     @FocusState private var isEditorFocused: Bool
 
-    
-    init(appState: AppState, message: Message) {
+    init(appState: AppState, message: Message, isTTSEnabled: Bool) {
         self.message = message
         self.appState = appState
+        self.isTTSEnabled = isTTSEnabled
         armedButton = .None
         _isThinkingExpanded = State(initialValue: message.isThinkingExpanded)
     }
@@ -198,7 +199,7 @@ struct MessageView: View {
                     }
                     .buttonStyle(.plain)
                     
-                    if message.sender == .ai && appState.modelConfig?.tts.isEnabled ?? false {
+                    if message.sender == .ai && isTTSEnabled{
                         Button(action: {
                             Task {
                                 guard appState.modelConfig != nil else { return }
@@ -406,7 +407,6 @@ struct MessageView: View {
 
             }
         }
-
     }
     
     private func regenerateButtonAction() {

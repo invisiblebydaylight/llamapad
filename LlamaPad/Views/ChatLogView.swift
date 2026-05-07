@@ -37,9 +37,12 @@ struct ChatLogView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 0) {
                             ForEach(messages) { message in
-                                MessageView(appState: appState, message: message).id(message.id)
+                                MessageView(appState: appState,
+                                            message: message,
+                                            isTTSEnabled: appState.modelConfig?.tts.isEnabled ?? false)
+                                .id(message.id)
                             }
                             
                             if appState.isGenerating, let pct = appState.processingProgress, let status = appState.processingStatus {

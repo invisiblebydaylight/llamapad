@@ -29,13 +29,34 @@ class Message: ObservableObject, Identifiable, Codable {
     // the full actual content of the message
     @Published var content: String {
         didSet {
-            parsedContent = ParsedMessage.parse(content)
+            guard content != oldValue else { return }
+            
+            if parseComplete {
+                // If we're just appending (the streaming case), don't re-parse.
+                // Slice off the prefix we already saw and append the delta.
+                if let range = content.range(of: oldValue),
+                   range.lowerBound == content.startIndex {
+                    let delta = String(content[range.upperBound...])
+                    parsedContent = ParsedMessage(
+                        thinkingContent: parsedContent.thinkingContent,
+                        responseContent: parsedContent.responseContent + delta
+                    )
+                    return
+                }
+                // If content changed non-monotonically (edit), fall through to re-parse.
+                parseComplete = false
+            }
+            
+            let newParsed = ParsedMessage.parse(content)
+            parsedContent = newParsed
+            parseComplete = (newParsed.thinkingContent != nil && !newParsed.responseContent.isEmpty)
         }
     }
     
     // the content property, but with the thinking
     // content parsed into a separate string.
     @Published private(set) var parsedContent: ParsedMessage
+    private var parseComplete: Bool = false
     
     // keeps track of whether or not the 'think' block is expanded
     // in the UI for this message
@@ -50,6 +71,7 @@ class Message: ObservableObject, Identifiable, Codable {
         self.content = content
         let parsedContent = ParsedMessage.parse(content)
         self.parsedContent = parsedContent
+        self.parseComplete = (parsedContent.thinkingContent != nil && !parsedContent.responseContent.isEmpty)
     }
 
     required convenience init(from decoder: Decoder) throws {

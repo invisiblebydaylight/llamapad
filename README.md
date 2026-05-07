@@ -103,7 +103,7 @@ Eventually, if interest continues, this application will get more features devel
 a more robust experience:
 
 * Tool call support ; MCP support
-* Backend expansion into MLX and remote OpenAI-compatible API endpoints for extra flexibility.
+* Backend expansion into remote OpenAI-compatible API endpoints for extra flexibility.
 * Paralizable, batched requests that might be useful for behind-the-scenes agent stuff.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
 * Maybe even more inventive things like visualizing token logits at each step for illustration purposes
@@ -143,8 +143,6 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.
 * The configuration and chatlog are saved in the app's application support directory on macOS, is something like: 
   `/Users/<USER>/Library/Containers/LlamaPad/Data/Library/Application Support/com.invisiblebydaylight.LlamaPad/`
-* Kokoro-ios is pinned to 1.0.10 because upgrading to 1.0.11 broke audio on iOS targets
-  (https://github.com/mlalma/KokoroTestApp/issues/7).
 * Metal was really obnoxious about not releasing memory no matter how long the app sleeps after freeing the model,
   context and sampler. Turns out, adding a dummy GPU operation using MLX forced a synchronization point, clearing
   the Metal command queue which caused the memory to *actually* be released.
