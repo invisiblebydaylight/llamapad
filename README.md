@@ -41,10 +41,10 @@ finishes generating it will attempt to speak it out loud using TTS.
 ## Features
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native text generation.
 * Embedded [MLX](https://github.com/ml-explore/mlx-swift-lm) library for native Apple Silicon support.
-* AI chat interface with customizable sampler settings and basic model configuration that supports GGUF files.
-* Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages.
+* AI chat interface with customizable sampler settings and basic model configuration options.
+* Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages. Note: support for the G2P pass is currently broken, and it will not sound great.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
-* Simple, but effective use of the KV cache to keep prompt processing to a minimum.
+* Simple, but effective use of the KV cache to keep prompt processing to a minimum for GGUF models.
 * Basic conversation based workflow, supporting many chatlogs.
 * Jinja support for prompt formatting using the [swift-jinja](https://github.com/huggingface/swift-jinja) library.
 
@@ -58,9 +58,7 @@ finishes generating it will attempt to speak it out loud using TTS.
   model is loaded when the user sends a message, generates a response or regenerates an existing one.
 * KV cache quantization now supported and settings can be found in the 'Advanced' group of the Model config tab.
 * Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
-  [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library. Note: support for the G2P pass 
-  is currently broken, and it will not sound great.
-* Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
+  [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library. * Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
   for prompt construction if possible; still can override to built-in templates from llama.cpp...
 * Conversations can be created, renamed, duplicated and deleted.
 * System message is now in conversation metadata.
