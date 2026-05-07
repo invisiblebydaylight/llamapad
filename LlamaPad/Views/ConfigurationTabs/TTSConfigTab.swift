@@ -55,15 +55,26 @@ struct TTSConfigTab: View {
                 .disabled(!draftConfig.tts.isEnabled)
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 
-                VStack {
-                    HStack {
-                        Text("Kokoro Voice File")
-                        
-                        Spacer()
-                        
-                        // FIXME: TTS voice selection
-                        Text("Disabled...")
-                    }
+                HStack {
+                    Text("Voice")
+                    Spacer()
+                    TextField("", text: $draftConfig.tts.voice)
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width:120)
+                        .help("Kokoro voice name (e.g., af_heart, af_bell, am_adam)")
+                }
+                .disabled(!draftConfig.tts.isEnabled)
+                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+                
+                HStack {
+                    Text("Language")
+                    Spacer()
+                    TextField("", text: $draftConfig.tts.language)
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width:120)
+                        .help("Language code (e.g., en, es, fr, ja, ko, zh)")
                 }
                 .disabled(!draftConfig.tts.isEnabled)
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)

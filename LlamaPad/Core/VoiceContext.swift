@@ -88,7 +88,8 @@ class VoiceContext: ObservableObject {
         // MLX integration, as that is the whole point of this branch.
         //
         // new implementation
-        tts = try await KokoroModel.fromModelDirectory(modelDirectory)
+        let processor = MLXAudioTTS.KokoroMultilingualProcessor()
+        tts = try await KokoroModel.fromModelDirectory(modelDirectory, textProcessor: processor)
         isReady = true
     }
     
@@ -146,7 +147,7 @@ class VoiceContext: ObservableObject {
         
         // break the text string into 'paragraphs' by splitting at newlines and trimming
         let paragraphs = text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).removingEmoji() }
             .filter { !$0.isEmpty }
         
         // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
@@ -158,10 +159,10 @@ class VoiceContext: ObservableObject {
             let audio = try await Task.detached(priority: .utility) {
                 let result = try await tts.generate(
                     text: paragraph,
-                    voice: "af_heart",
+                    voice: config.voice,
                     refAudio: nil,
                     refText: nil,
-                    language: "en",
+                    language: config.language,
                 )
                 
                 // without clearing the cache, it would appear that memory stacks up
@@ -258,5 +259,17 @@ class VoiceContext: ObservableObject {
         currentVoiceURL?.stopAccessingSecurityScopedResource()
         currentModelURL = nil
         currentVoiceURL = nil
+    }
+}
+
+extension String {
+    func removingEmoji() -> String {
+        return self.replacingOccurrences(
+            of: "[\\p{Emoji_Presentation}\\p{Extended_Pictographic}]",
+            with: " ",
+            options: .regularExpression
+        )
+        .replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespaces)
     }
 }

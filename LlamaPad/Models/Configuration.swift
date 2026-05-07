@@ -12,6 +12,8 @@ struct TTSConfiguration: Codable {
     var modelDirectory: String = ""
     var modelBookmark: Data? = nil
     var autoPlayEnabled: Bool = false
+    var voice: String = ""
+    var language: String = "en"
 }
 
 class AppConfiguration: ObservableObject, Codable {

@@ -1,10 +1,6 @@
 # llamapad (v0.3.0)
 
-A native MacOS and iOS chat application for local LLM inference, built on top of  
-[llama.cpp](https://github.com/ggml-org/llama.cpp/) and
-[mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device.
-Nothing is sent to the cloud. The app is sandboxed with only read-only access
-to the files you select. No network access, no microphone.
+A native MacOS and iOS chat application for local LLM inference, built on top of [llama.cpp](https://github.com/ggml-org/llama.cpp/) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device. The app is sandboxed with read-only access to the files you select. Network access is optional and only used for features you explicitly enable (Currently: Text-to-Speech setup). No microphone.
 
 Features conversation management, Jinja template support, text-to-speech
 and a privacy-first design philosophy.
@@ -42,7 +38,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native text generation.
 * Embedded [MLX](https://github.com/ml-explore/mlx-swift-lm) library for native Apple Silicon support.
 * AI chat interface with customizable sampler settings and basic model configuration options.
-* Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages. Note: support for the G2P pass is currently broken, and it will not sound great.
+* Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum for GGUF models.
 * Basic conversation based workflow, supporting many chatlogs.
@@ -50,6 +46,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
+* Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines.
 * Support for MLX models has landed! It might still be rough around the edges as it's a new backend. To support having a new backend implementation, a common protocol has been developed and utilized.
 * Performance metrics are now recorded for each message and shown on mouse hover (macOS) or swipe (iOS).
 * Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.
@@ -57,8 +54,7 @@ finishes generating it will attempt to speak it out loud using TTS.
   button has been added next to the config button to manually control the behavior, otherwise the configured
   model is loaded when the user sends a message, generates a response or regenerates an existing one.
 * KV cache quantization now supported and settings can be found in the 'Advanced' group of the Model config tab.
-* Text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) on MLX using the
-  [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library. * Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
+* Embedded [swift-jinja](https://github.com/huggingface/swift-jinja) to use embedded Jinja templates
   for prompt construction if possible; still can override to built-in templates from llama.cpp...
 * Conversations can be created, renamed, duplicated and deleted.
 * System message is now in conversation metadata.
@@ -84,6 +80,11 @@ Now you can open up the `LlamaPad.xcodeproj` file in Xcode and run it. When atte
 something like an iPad, you may have to change your Signing credentials for the project before it builds
 and runs on the target device.
 
+### Text-to-Speech Setup
+
+In addition to the Kokoro model and voices, you'll need to have the right G2P library installed as well.
+
+This requires a one-time network download of G2P support files (~5MB). Enable TTS in configuration and generate speech once with Internet access. After caching, TTS works offline.
 
 ## Known Limitations
 
