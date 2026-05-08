@@ -22,6 +22,26 @@ struct TTSConfigTab: View {
                 }
                 
                 HStack {
+                    Text("Engine")
+                    Spacer()
+                    Picker("", selection: Binding<TTSEngine>(
+                        get: { draftConfig.tts.engine },
+                        set: { newValue in
+                            DispatchQueue.main.async {
+                                draftConfig.tts.engine = newValue
+                            }
+                        }
+                    )) {
+                        ForEach(TTSEngine.allCases, id: \.self) { engine in
+                            Text(engine.rawValue).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .disabled(!draftConfig.tts.isEnabled)
+                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+             
+                HStack {
                     Toggle("Automatic Play", isOn: $draftConfig.tts.autoPlayEnabled)
                         .help("Automatically play generated text when it is added to the chat")
 
@@ -31,12 +51,12 @@ struct TTSConfigTab: View {
                 
                 VStack {
                     HStack {
-                        Text("Kokoro Model File")
+                        Text("TTS Model Folder")
                         
                         Spacer()
                         
                         if draftConfig.tts.modelDirectory.isEmpty {
-                            Text("Kokoro Folder Required...")
+                            Text("TTS model folder required...")
                                 .foregroundColor(Color(.systemRed))
                                 .italic()
                         } else {
@@ -55,17 +75,31 @@ struct TTSConfigTab: View {
                 .disabled(!draftConfig.tts.isEnabled)
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 
-                HStack {
-                    Text("Voice")
-                    Spacer()
-                    TextField("", text: $draftConfig.tts.voice)
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width:120)
-                        .help("Kokoro voice name (e.g., af_heart, af_bell, am_adam)")
+                if draftConfig.tts.engine == .kokoro {
+                    HStack {
+                        Text("Voice")
+                        Spacer()
+                        TextField("", text: $draftConfig.tts.voice)
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width:120)
+                            .help("Kokoro voice name (e.g., af_heart, af_bell, am_adam)")
+                    }
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+                } else {
+                    HStack {
+                        Text("Voice")
+                        Spacer()
+                        TextField("", text: $draftConfig.tts.voice)
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth:200, maxWidth:300)
+                            .help("Description of the voice.")
+                    }
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
-                .disabled(!draftConfig.tts.isEnabled)
-                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 
                 HStack {
                     Text("Language")
@@ -104,13 +138,13 @@ struct TTSConfigTab: View {
                 // generate our persistent bookmark
                 #if os(macOS)
                 let bookmarkData = try url.bookmarkData(
-                    options: .securityScopeAllowOnlyReadAccess,
+                    options: .withSecurityScope,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
                 #else
                 let bookmarkData = try url.bookmarkData(
-                    options: .minimalBookmark,
+                    options: .withSecurityScope,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )

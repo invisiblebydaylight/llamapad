@@ -1,6 +1,6 @@
 # llamapad (v0.3.0)
 
-A native MacOS and iOS chat application for local LLM inference, built on top of [llama.cpp](https://github.com/ggml-org/llama.cpp/) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device. The app is sandboxed with read-only access to the files you select. Network access is optional and only used for features you explicitly enable (Currently: Text-to-Speech setup). No microphone.
+A native MacOS and iOS chat application for local LLM inference, built on top of [llama.cpp](https://github.com/ggml-org/llama.cpp/) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device. The app is sandboxed with access only to the files you select. Network access is optional and only used for features you explicitly enable (Currently: Text-to-Speech setup). No microphone use.
 
 Features conversation management, Jinja template support, text-to-speech
 and a privacy-first design philosophy.
@@ -46,7 +46,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
-* Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines.
+* Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines. This means that support for multiple engines will be enabled. Currently there is: Kokoro and Qwen3-TTS.
 * Support for MLX models has landed! It might still be rough around the edges as it's a new backend. To support having a new backend implementation, a common protocol has been developed and utilized.
 * Performance metrics are now recorded for each message and shown on mouse hover (macOS) or swipe (iOS).
 * Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.
@@ -82,9 +82,27 @@ and runs on the target device.
 
 ### Text-to-Speech Setup
 
-In addition to the Kokoro model and voices, you'll need to have the right G2P library installed as well.
+#### Kokoro
+Clone or download from [mlx-community/Kokoro-82M-bf16](https://huggingface.co/mlx-community/Kokoro-82M-bf16). Voice names are short identifiers like `af_heart`, `af_bella`, `am_adam`. See the [Kokoro voices list](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/voices/VOICES.md) for options. For language, use a two letter code like "en".
 
-This requires a one-time network download of G2P support files (~5MB). Enable TTS in configuration and generate speech once with Internet access. After caching, TTS works offline.
+Kokoro requires a one-time network download of G2P support files (~5MB). Enable TTS in configuration and generate speech once with Internet access. After caching, TTS works offline.
+
+#### Qwen3 TTS
+This family of TTS models comes in different variants:
+
+**Base - ** [mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) - Simple TTS with built in voice.
+
+**Custom - ** [mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16) - Supports named speakers (Vivian, Serena, Uncle_Fu, Dylan, Eric, Ryan, Aiden, Ono_Anna, Sohee) with style prompting.
+
+**Voice Designer - ** [mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) - Voices are based on descriptive prompts:
+
+| Example Prompt | Result |
+|----------------|--------|
+| `A cheerful young female voice with high pitch and energetic tone.` | Animated, bright delivery |
+| `A calm male voice with moderate depth and a measured, thoughtful delivery.` | Grounded, intelligent sound |
+| `A grounded male voice with warm resonance and a steady, unhurried pace.` | Warm, reassuring tone |
+
+
 
 ## Known Limitations
 

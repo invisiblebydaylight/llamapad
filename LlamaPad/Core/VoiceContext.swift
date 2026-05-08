@@ -41,7 +41,7 @@ class VoiceContext: ObservableObject {
     private var currentVoiceURL: URL?
 
     /// the loaded kokoro engine
-    private var tts: KokoroModel?
+    private var tts: SpeechGenerationModel?
     
     var isLoaded: Bool {
         return tts != nil
@@ -68,7 +68,7 @@ class VoiceContext: ObservableObject {
     
     /// loads the kokoro model safetensors file and the selected kokoro voice safetensors file and throws
     /// an exception if something goes wrong.
-    private func loadModelFiles(modelDirectory: URL) async throws {
+    private func loadModelFiles(modelDirectory: URL, config: TTSConfiguration) async throws {
         guard !isLoadingModel else { return }
         
         isReady = false
@@ -77,19 +77,15 @@ class VoiceContext: ObservableObject {
         defer {
             isLoadingModel = false
         }
+
+        switch config.engine {
+        case .kokoro:
+            let processor = MLXAudioTTS.KokoroMultilingualProcessor()
+            tts = try await KokoroModel.fromModelDirectory(modelDirectory, textProcessor: processor)
+        case .qwen3:
+            tts = try await Qwen3TTSModel.fromModelDirectory(modelDirectory)
+        }
         
-        // FIXME: current implementation tries to download things for the text processor
-        // and since I don't have network capability enabled, it just fails.
-        // so I disabled the text processor, which means there's no G2P pass so the
-        // TTS is more or less busted - though it technically does work using the new
-        // embedded library.
-        //
-        // It's an intentional decision to leave things broken like this and work on the
-        // MLX integration, as that is the whole point of this branch.
-        //
-        // new implementation
-        let processor = MLXAudioTTS.KokoroMultilingualProcessor()
-        tts = try await KokoroModel.fromModelDirectory(modelDirectory, textProcessor: processor)
         isReady = true
     }
     
@@ -107,7 +103,7 @@ class VoiceContext: ObservableObject {
         }
         
         currentModelURL = modelURL
-        try await self.loadModelFiles(modelDirectory: modelURL)
+        try await self.loadModelFiles(modelDirectory: modelURL, config: config)
     }
     
     private func resolve(_ data: Data?, fallback: String) throws -> URL? {
@@ -144,6 +140,7 @@ class VoiceContext: ObservableObject {
         
         // tag this particular messageId as the one we're speaking, if supplied with the UUID
         speakingMessageID = messageId
+        defer { speakingMessageID = nil }
         
         // break the text string into 'paragraphs' by splitting at newlines and trimming
         let paragraphs = text.components(separatedBy: "\n")

@@ -1,6 +1,11 @@
 import Combine
 import SwiftUI
 
+enum TTSEngine: String, Codable, CaseIterable {
+    case kokoro = "Kokoro"
+    case qwen3 = "Qwen3-TTS"
+}
+
 enum InferenceBackendType: String, Codable, CaseIterable {
     case llamaCPP = "llama.cpp"
     case mlx = "mlx"
@@ -8,6 +13,7 @@ enum InferenceBackendType: String, Codable, CaseIterable {
 }
 
 struct TTSConfiguration: Codable {
+    var engine: TTSEngine = .kokoro
     var isEnabled: Bool = false
     var modelDirectory: String = ""
     var modelBookmark: Data? = nil

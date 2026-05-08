@@ -63,11 +63,9 @@ class MLXBackend: InferenceBackend {
     }
     
     func unload() async {
-        // FIXME: is this enough? confirm...
         loadedModel = nil
     }
     func shutdown() {
-        // FIXME: is this enough? confirm...
         loadedModel = nil
     }
     
