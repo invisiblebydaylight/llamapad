@@ -3,6 +3,7 @@ import CoreML
 import AVFoundation
 import Combine
 import MLXAudioTTS
+import MLXAudioCore
 
 enum VoiceError: LocalizedError {
     case noVoiceTensor
@@ -38,7 +39,7 @@ class VoiceContext: ObservableObject {
 
     // track the URLs used so we can stop accessing them on unload
     private var currentModelURL: URL?
-    private var currentVoiceURL: URL?
+    private var currentRefAudioURL: URL?
 
     /// the loaded kokoro engine
     private var tts: SpeechGenerationModel?
@@ -147,6 +148,33 @@ class VoiceContext: ObservableObject {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).removingEmoji() }
             .filter { !$0.isEmpty }
         
+        
+        // if we setup voice cloning data then load it up
+        var refAudio: MLXArray? = nil
+        var refAudioText: String? = nil
+        if !config.refAudioText.isEmpty {
+            refAudioText = config.refAudioText
+        }
+        if  refAudioText != nil,
+            let refAudioURL = config.refAudioPath,
+            let refURL = try resolve(config.refAudioBookmark, fallback: refAudioURL)
+        {
+            let gotAccess = refURL.startAccessingSecurityScopedResource()
+            defer {
+                if gotAccess { refURL.stopAccessingSecurityScopedResource() }
+            }
+            
+            do {
+                let (_, refAudioArray) = try loadAudioArray(from: refURL)
+                currentRefAudioURL = refURL
+                refAudio = refAudioArray
+            } catch {
+                refAudioText = nil
+                print("Warning: Failed to load reference audio: \(error.localizedDescription)")
+                // Continue without cloning rather than crashing
+            }
+        }
+        
         // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
         interruptRequested = false
         for (i, paragraph) in paragraphs.enumerated() {
@@ -156,9 +184,9 @@ class VoiceContext: ObservableObject {
             let audio = try await Task.detached(priority: .utility) {
                 let result = try await tts.generate(
                     text: paragraph,
-                    voice: config.voice,
-                    refAudio: nil,
-                    refText: nil,
+                    voice: !config.voice.isEmpty ? config.voice : nil,
+                    refAudio: refAudio,
+                    refText: refAudioText,
                     language: config.language,
                 )
                 
@@ -253,9 +281,9 @@ class VoiceContext: ObservableObject {
         
         // release the sandbox hold on the files
         currentModelURL?.stopAccessingSecurityScopedResource()
-        currentVoiceURL?.stopAccessingSecurityScopedResource()
+        currentRefAudioURL?.stopAccessingSecurityScopedResource()
         currentModelURL = nil
-        currentVoiceURL = nil
+        currentRefAudioURL = nil
     }
 }
 

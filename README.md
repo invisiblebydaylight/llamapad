@@ -81,20 +81,17 @@ something like an iPad, you may have to change your Signing credentials for the 
 and runs on the target device.
 
 ### Text-to-Speech Setup
-
 #### Kokoro
-Clone or download from [mlx-community/Kokoro-82M-bf16](https://huggingface.co/mlx-community/Kokoro-82M-bf16). Voice names are short identifiers like `af_heart`, `af_bella`, `am_adam`. See the [Kokoro voices list](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/voices/VOICES.md) for options. For language, use a two letter code like "en".
+Clone or download from [mlx-community/Kokoro-82M-bf16](https://huggingface.co/mlx-community/Kokoro-82M-bf16). Voice names are short identifiers like `af_heart`, `af_bella`, `am_adam`. See the [Kokoro voices list](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md) for options. For language, use a two letter code like "en".
 
 Kokoro requires a one-time network download of G2P support files (~5MB). Enable TTS in configuration and generate speech once with Internet access. After caching, TTS works offline.
 
 #### Qwen3 TTS
 This family of TTS models comes in different variants:
 
-**Base - ** [mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) - Simple TTS with built in voice.
-
-**Custom - ** [mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16) - Supports named speakers (Vivian, Serena, Uncle_Fu, Dylan, Eric, Ryan, Aiden, Ono_Anna, Sohee) with style prompting.
-
-**Voice Designer - ** [mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) - Voices are based on descriptive prompts:
+Base: [mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) - Simple TTS with built in voice.
+Custom: [mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16) - Supports named speakers (Vivian, Serena, Uncle_Fu, Dylan, Eric, Ryan, Aiden, Ono_Anna, Sohee) with style prompting.
+Voice Designer: [mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) - Voices are based on descriptive prompts:
 
 | Example Prompt | Result |
 |----------------|--------|
@@ -102,6 +99,11 @@ This family of TTS models comes in different variants:
 | `A calm male voice with moderate depth and a measured, thoughtful delivery.` | Grounded, intelligent sound |
 | `A grounded male voice with warm resonance and a steady, unhurried pace.` | Warm, reassuring tone |
 
+Qwen3 TTS Usage Guide:
+* When using voice cloning options (Base model), make sure to have your reference audio sampled at 24kHz or else it'll sound time-warped. Supply the Reference Audio WAV file and the transcription for it in Reference Text; no need to set Voice Description.
+* When using plain TTS without direction (Base model), Voice Description, Reference Audio and Reference Text do not need to be set. It'll use a 'random' voice.
+* When using one of Qwen3-TTS's custom voices (CustomVoice model), set the Voice Description and reference one of the speaker names; do not set Reference Audio or Reference Text.
+* When using the voice designer (VoiceDesign model), set the Voice Description but do not set Reference Audio or Reference Text.
 
 
 ## Known Limitations

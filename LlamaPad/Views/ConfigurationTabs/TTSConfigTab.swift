@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 enum TTSPickerTarget {
     case model
+    case refAudio
 }
 
 struct TTSConfigTab: View {
@@ -77,19 +78,19 @@ struct TTSConfigTab: View {
                 
                 if draftConfig.tts.engine == .kokoro {
                     HStack {
-                        Text("Voice")
+                        Text("Voice Name")
                         Spacer()
                         TextField("", text: $draftConfig.tts.voice)
                             .labelsHidden()
                             .textFieldStyle(.roundedBorder)
-                            .frame(width:120)
+                            .frame(width:200)
                             .help("Kokoro voice name (e.g., af_heart, af_bell, am_adam)")
                     }
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 } else {
                     HStack {
-                        Text("Voice")
+                        Text("Voice Description")
                         Spacer()
                         TextField("", text: $draftConfig.tts.voice)
                             .labelsHidden()
@@ -107,18 +108,68 @@ struct TTSConfigTab: View {
                     TextField("", text: $draftConfig.tts.language)
                         .labelsHidden()
                         .textFieldStyle(.roundedBorder)
-                        .frame(width:120)
-                        .help("Language code (e.g., en, es, fr, ja, ko, zh)")
+                        .frame(width:200)
+                        .help(draftConfig.tts.engine == .kokoro ?
+                              "Language code (e.g., en, es, fr, ja, ko, zh)" : "Language (e.g. 'English')"
+                        )
                 }
                 .disabled(!draftConfig.tts.isEnabled)
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+
+                if draftConfig.tts.engine == .qwen3 {
+                    Section("Voice Cloning") {
+                        HStack {
+                            Text("Reference Audio")
+                            Spacer()
+                            if draftConfig.tts.refAudioPath == nil {
+                                Text("No file selected")
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            } else {
+                                Text(URL(fileURLWithPath: draftConfig.tts.refAudioPath!).lastPathComponent)
+                                    .lineLimit(1)
+                            }
+                            Button("Browse...") {
+                                pickerTarget = .refAudio
+                                showingFilePicker = true
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        
+                        HStack {
+                            Text("Reference Text")
+                            Spacer()
+                            TextField("", text: $draftConfig.tts.refAudioText)
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                .frame(minWidth:200, maxWidth:300)
+                                .help("Transcription of what is being said in the reference audio file.")
+                        }
+                        
+                        if draftConfig.tts.refAudioPath != nil {
+                            Button("Clear") {
+                                draftConfig.tts.refAudioPath = nil
+                                draftConfig.tts.refAudioBookmark = nil
+                                draftConfig.tts.refAudioText = ""
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        }
+
+                    }
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+                }
             }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .fileImporter(
             isPresented: $showingFilePicker,
-            allowedContentTypes: [.folder],
+            allowedContentTypes: pickerTarget == .model
+                ? [.folder]
+                : [UTType(filenameExtension: "wav", conformingTo: .data) ?? .data],
             allowsMultipleSelection: false
         ) { result in
             handleFileSelection(result)
@@ -135,16 +186,23 @@ struct TTSConfigTab: View {
             }
 
             do {
-                // generate our persistent bookmark
+                // generate our persistent bookmark; we use read-only for the
+                // audio reference, but we take read-write for the TTS model
+                // directory because the mlx-audio-swift library will write
+                // files to it for some engine types (like Qwen3-TTS).
                 #if os(macOS)
                 let bookmarkData = try url.bookmarkData(
-                    options: .withSecurityScope,
+                    options: pickerTarget == .model ?
+                        .withSecurityScope :
+                        .securityScopeAllowOnlyReadAccess,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
                 #else
                 let bookmarkData = try url.bookmarkData(
-                    options: .withSecurityScope,
+                    options: pickerTarget == .model ?
+                        .withSecurityScope :
+                        .securityScopeAllowOnlyReadAccess,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
@@ -154,6 +212,9 @@ struct TTSConfigTab: View {
                 case .model:
                     draftConfig.tts.modelDirectory = url.path
                     draftConfig.tts.modelBookmark = bookmarkData
+                case .refAudio:
+                    draftConfig.tts.refAudioPath = url.path
+                    draftConfig.tts.refAudioBookmark = bookmarkData
                 }
             } catch {
                 errorMessage = "Failed to create the bookmark: \(error)"

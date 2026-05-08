@@ -17,6 +17,9 @@ struct TTSConfiguration: Codable {
     var isEnabled: Bool = false
     var modelDirectory: String = ""
     var modelBookmark: Data? = nil
+    var refAudioPath: String? = nil
+    var refAudioBookmark: Data? = nil
+    var refAudioText: String = ""
     var autoPlayEnabled: Bool = false
     var voice: String = ""
     var language: String = "en"
