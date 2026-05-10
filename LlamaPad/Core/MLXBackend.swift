@@ -5,15 +5,50 @@ import MLXLLM
 import MLXLMTransformers
 import MLX
 
+/// this struct gets built to act as a String representation of the KV cache and gets
+/// used to test if a new ChatSession needs to be created.
+private struct SessionSignature: Equatable {
+    let system: String?
+    let messages: [String]
+    
+    //NOTE: Only deals with text and does not check images/video
+    static func createChatSessionSignature(instruction: String?, messages: [Chat.Message]) -> Self {
+        let strings: [String] = messages.map(\.content)
+        return Self.init(
+            system: instruction,
+            messages: strings)
+    }
+    
+    /// checks to see if the session signatures are considered equal without change
+    func checkSignature(against other: Self) -> Bool {
+        //system == other.system && messages.elementsEqual(other.messages)
+        
+        //DEBUG FIXME just testing to see if regneration works with this...
+        system == other.system
+            && messages.prefix(other.messages.count).elementsEqual(other.messages)
+    }
+}
+
 @MainActor
 class MLXBackend: InferenceBackend {
     private var loadedConfig: AppConfiguration?
     private var loadedModel: ModelContainer?
     private var internalLastPromptTokenCount: Int? = nil
     
+    /// this is the cached ChatSessiont that can be reused if SessionSignature checks out
+    private var chatSession: ChatSession? = nil
+    
+    /// this is used to test against the current messages the client wishes to send to the
+    /// backend to see if a new ChatSession needs to get created because messages changed.
+    private var chatSessionSignature: SessionSignature? = nil
+    
     var isLoaded: Bool { loadedModel != nil }
     var contextLimit: Int = 0
-    var lastPromptTokenCount: Int? { internalLastPromptTokenCount }
+    
+    /// NOTE: we don't return `internalLastPromptTokenCount` here because we can't track it accurately.
+    /// For example, regenerating the last message several times would just report more and more tokens used in
+    /// the cache space, which would be inaccurate. Instead, we just disable this number for this backend.
+    var lastPromptTokenCount: Int? { nil }
     
     func load(from config: AppConfiguration) async throws {
         // make sure to seed the RNG
@@ -134,15 +169,26 @@ class MLXBackend: InferenceBackend {
             generateParameters.maxTokens = nil
         }
         
-        let session = ChatSession(model,
-                                  instructions: systemMessage,
-                                  history: mlxMessages,
-                                  generateParameters: generateParameters,
-                                  additionalContext: ["enable_thinking" : loadedConfig?.enableThinking ?? false])
+        // create a new signature to check against our last signature for the session
+        let newSessionSignature = SessionSignature.createChatSessionSignature(instruction: systemMessage, messages: mlxMessages)
+        
+        // check to see if we need to create a new session
+        if chatSession == nil || !(chatSessionSignature?.checkSignature(against: newSessionSignature) ?? false) {
+            chatSession = ChatSession(model,
+                                      instructions: systemMessage,
+                                      history: mlxMessages,
+                                      generateParameters: generateParameters,
+                                      additionalContext: ["enable_thinking" : loadedConfig?.enableThinking ?? false])
+            chatSessionSignature = newSessionSignature
+            internalLastPromptTokenCount = 0
+        } else {
+            // we're going to reuse the session, but we need to remove any system messages in the history we're using
+            chatSession?.instructions = nil
+        }
         
         // This returns AsyncThrowingStream<String, Error>
         // but we need it to be AsyncThrowingStream<GenerationChunk, Error> ...
-        let mlxStream = session.streamDetails(to: targetMsg?.parsedContent.responseContent ??
+        let mlxStream = chatSession!.streamDetails(to: targetMsg?.parsedContent.responseContent ??
                                               "Tell the user the software they use is bugged because the AI cannot see the message to respond to.",
                                               images: [], videos: [])
         
@@ -151,6 +197,7 @@ class MLXBackend: InferenceBackend {
             let task = Task {
                 do {
                     var tokensGenerated = 0
+                    var accumulatedResponse = ""
                     
                     continuation.yield(GenerationChunk(
                         text: "",
@@ -165,6 +212,7 @@ class MLXBackend: InferenceBackend {
                         // if we got a chunk of text generated, send it
                         if let chunk = gen.chunk {
                             tokensGenerated += 1
+                            accumulatedResponse.append(chunk)
                             continuation.yield(GenerationChunk(
                                 text: chunk,
                                 isPromptProcessing: false,
@@ -183,6 +231,31 @@ class MLXBackend: InferenceBackend {
                                 tokensGenerated: info.generationTokenCount
                             ))
                         }
+                    }
+                    
+                    // if we've completed the message, update the signature
+                    if !Task.isCancelled, let target = targetMsg {
+                        let userContent = target.parsedContent.responseContent
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        let assistantContent = accumulatedResponse
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        // mlxMessages is the prefix WITHOUT the target user message,
+                        // captured from the outer scope. build the canonical history
+                        // exactly as the messageLog represents it.
+                        var updatedMessages = mlxMessages.map {
+                            $0.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                        updatedMessages.append(userContent)
+                        updatedMessages.append(assistantContent)
+                        self.chatSessionSignature = SessionSignature(
+                            system: systemMessage,
+                            messages: updatedMessages
+                        )
+                    } else {
+                        // make sure to erase the session and signature if we didn't complete the generation
+                        self.chatSession = nil
+                        self.chatSessionSignature = nil
                     }
                     
                     continuation.finish()
