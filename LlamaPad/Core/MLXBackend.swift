@@ -21,9 +21,6 @@ private struct SessionSignature: Equatable {
     
     /// checks to see if the session signatures are considered equal without change
     func checkSignature(against other: Self) -> Bool {
-        //system == other.system && messages.elementsEqual(other.messages)
-        
-        //DEBUG FIXME just testing to see if regneration works with this...
         system == other.system
             && messages.prefix(other.messages.count).elementsEqual(other.messages)
     }
@@ -49,6 +46,12 @@ class MLXBackend: InferenceBackend {
     /// For example, regenerating the last message several times would just report more and more tokens used in
     /// the cache space, which would be inaccurate. Instead, we just disable this number for this backend.
     var lastPromptTokenCount: Int? { nil }
+
+    /// used by `prepareMessageForBackend` to figure out where to start the message log
+    /// to send to the backend engine. that way we can constrict the log a little more, pin it to start
+    /// at a message and then let it grow without having to risk full context reprocessing with every message.
+    private var contextAnchorID: UUID? = nil
+
     
     func load(from config: AppConfiguration) async throws {
         // make sure to seed the RNG
@@ -284,7 +287,9 @@ class MLXBackend: InferenceBackend {
             ? config.maxGenerationLength
             : config.reservedContextBuffer
         let safetyThreshold = effectiveContext - generationBudget
-        
+        let runwayTarget = max(0, config.contextRunway)
+        let limitWithRunway = max(0, safetyThreshold - runwayTarget)
+
         // Tokenize system message to reserve its budget
         var totalTokens = 0
         if let sysMsg = systemMessage, !sysMsg.isEmpty {
@@ -292,6 +297,7 @@ class MLXBackend: InferenceBackend {
         }
         
         var startIndex = messages.count
+        var safetyThresholdBreached = false
         
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
             let content = messages[i].parsedContent.responseContent
@@ -301,13 +307,40 @@ class MLXBackend: InferenceBackend {
             let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
             
             if totalTokens + msgTokens > safetyThreshold {
+                safetyThresholdBreached = true
                 startIndex = i + 1
                 break
             }
             totalTokens += msgTokens
+            
+            if messages[i].id == contextAnchorID {
+                startIndex = i
+                break
+            }
+        }
+                
+        if startIndex == messages.count {
+            startIndex = 0
         }
         
-        if startIndex >= messages.count { return messages }
+        if safetyThresholdBreached {
+            while startIndex < messages.count && totalTokens > limitWithRunway {
+                let content = messages[startIndex].parsedContent.responseContent
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
+                totalTokens -= msgTokens
+                startIndex += 1
+            }
+        }
+        
+        if !messages.isEmpty && contextAnchorID != messages[startIndex].id {
+            contextAnchorID = messages[startIndex].id
+        }
+        
+        guard startIndex < messages.count else {
+            print("ERROR: startIndex out of bounds for prepareMessagesForBackend; returning empty array.")
+            return []
+        }
         return Array(messages[startIndex...])
     }
 

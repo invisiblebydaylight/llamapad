@@ -116,6 +116,7 @@ Qwen3 TTS Usage Guide:
   you'll get errors when trying to use TTS and the error message will have a coreaudio exception.
   There are currently no guard rails on what size models you can load; with great power
   comes great responsibility.
+* The MLX models don't support continuing partially generated messages natively unlike the llama.cpp backend.
 
 
 ## Future Goals
@@ -158,7 +159,6 @@ To maintain high performance, LlamaPad uses an "anchored" window strategy.
 - The `reservedContextBuffer` defines the minimum headroom kept for AI generation and thinking.
 - When the context usage exceeds `contextLength - reservedContextBuffer`, the window "slides" forward.
 - **The Runway Effect:** To prevent frequent, costly prompt re-ingestion, the window doesn't just slide by one message; it slides far enough to create a "runway" equal to the `contextRunway` amount. This means you will see a significant drop in context usage when the anchor moves (`reservedContextBuffer` + contextRunway), providing space for several turns of uninterrupted discourse.
-- MLX context handling differs from llama.cpp. While the llama.cpp backend uses an anchored window with runway to minimize KV cache regeneration, the MLX backend only truncates older mesages to fit and re-ingests the entire promopt on each generation.
 
 ### iOS and macOS
 * The `Increased Memory Limit` capability has been added to load models greater than 4GB in size.

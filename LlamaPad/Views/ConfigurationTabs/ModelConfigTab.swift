@@ -228,14 +228,12 @@ struct ModelConfigTab: View {
                         .opacity(draftConfig.maxGenerationLength > 0 ? 0.5 : 1.0)
                         .disabled(draftConfig.maxGenerationLength > 0) // only is effective if no max generation length set
                 }
-                if backend == .llamaCPP {
-                    HStack {
-                        Text("Context Runway")
-                        TextField("", value: $draftConfig.contextRunway, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
-                            .labelsHidden()
-                    }
+                HStack {
+                    Text("Context Runway")
+                    TextField("", value: $draftConfig.contextRunway, format: .number)
+                        .multilineTextAlignment(.trailing)
+                    Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
+                        .labelsHidden()
                 }
                 
                 if backend == .llamaCPP {
