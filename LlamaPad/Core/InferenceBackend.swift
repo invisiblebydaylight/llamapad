@@ -36,7 +36,8 @@ protocol InferenceBackend: AnyObject {
         messages: [Message],
         systemMessage: String?,
         isContinuation: Bool,
-        maxTokens: Int
+        maxTokens: Int,
+        samplerSettings: SamplerSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error>
 }
 

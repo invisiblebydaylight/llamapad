@@ -74,7 +74,6 @@ class LlamaBackend : InferenceBackend {
                 path: modelURL,
                 offloadCount: Int32(config.layerCountToOffload),
                 contextLength: UInt32(config.contextLength),
-                samplerSettings: config.customSampler,
                 kvCacheType: config.kvCacheType)
             print("Info: Model loading complete.\n")
         } catch {
@@ -134,8 +133,12 @@ class LlamaBackend : InferenceBackend {
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
-                  maxTokens: Int
+                  maxTokens: Int,
+                  samplerSettings: SamplerSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error> {
+        // ensure that we have our sampler chain built correctly
+        await llamaContext?.buildSamplerChain(from: samplerSettings)
+        
         // making sure this is set before building the prompt is important
         // because it's used for sliding context management.
         await llamaContext?.setNumberToPredict(maxTokens)

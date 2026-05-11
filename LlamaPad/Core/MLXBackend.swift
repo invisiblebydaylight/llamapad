@@ -38,7 +38,12 @@ class MLXBackend: InferenceBackend {
     /// this is used to test against the current messages the client wishes to send to the
     /// backend to see if a new ChatSession needs to get created because messages changed.
     private var chatSessionSignature: SessionSignature? = nil
-    
+
+    /// this is used to track the last 'seed' value used to seed the RNG; it's used as a comparison
+    /// test so that we don't keep reseeding the RNG unless necessary to do so.
+    /// NOTE: we store the user visible value, not the *actual* seed if '0' was used to randomize the seed.
+    private var lastSeed: UInt32? = nil
+
     var isLoaded: Bool { loadedModel != nil }
     var contextLimit: Int = 0
     
@@ -60,6 +65,7 @@ class MLXBackend: InferenceBackend {
         } else {
             MLX.seed(UInt64(Date.timeIntervalSinceReferenceDate * 1000))
         }
+        lastSeed = config.customSampler.magic_seed
         
         // attempt to use the stored security scoped bookmark if one
         // was aquired for this model file when building the new
@@ -118,8 +124,11 @@ class MLXBackend: InferenceBackend {
         return tokenCount
     }
     
-    func generate(messages: [Message], systemMessage: String?,
-                  isContinuation: Bool, maxTokens: Int) async throws
+    func generate(messages: [Message],
+                  systemMessage: String?,
+                  isContinuation: Bool,
+                  maxTokens: Int,
+                  samplerSettings: SamplerSettings) async throws
     -> AsyncThrowingStream<GenerationChunk, Error> {
         guard let model = loadedModel else {
             throw InferenceError.notLoaded("MLX backend not loaded")
@@ -154,29 +163,30 @@ class MLXBackend: InferenceBackend {
                                 : Chat.Message.Role.assistant,
                                 content: content)
         }
-        
-        // use our stored sampler settings
-        var generateParameters = GenerateParameters(maxTokens: loadedConfig?.maxGenerationLength,
-                                                    maxKVSize: loadedConfig?.contextLength,
-                                                    temperature: loadedConfig?.customSampler.temperature ?? 0.6,
-                                                    topP: loadedConfig?.customSampler.topP ?? 1.0,
-                                                    topK: Int(loadedConfig?.customSampler.topK ?? 0),
-                                                    minP: loadedConfig?.customSampler.minP ?? 0.0,
-                                                    repetitionPenalty: loadedConfig?.customSampler.repeatPenalty,
-                                                    repetitionContextSize: Int(loadedConfig?.customSampler.repeatLastN ?? 20),
-                                                    presencePenalty: loadedConfig?.customSampler.presencePenalty,
-                                                    presenceContextSize: Int(loadedConfig?.customSampler.repeatLastN ?? 20),
-                                                    frequencyPenalty: loadedConfig?.customSampler.freqPenalty,
-                                                    frequencyContextSize: Int(loadedConfig?.customSampler.repeatLastN ?? 20))
-        if generateParameters.maxTokens != nil && generateParameters.maxTokens! < 1 {
-            generateParameters.maxTokens = nil
-        }
-        
+                
         // create a new signature to check against our last signature for the session
         let newSessionSignature = SessionSignature.createChatSessionSignature(instruction: systemMessage, messages: mlxMessages)
         
         // check to see if we need to create a new session
         if chatSession == nil || !(chatSessionSignature?.checkSignature(against: newSessionSignature) ?? false) {
+            // use our sampler settings provided to generate a new set of parameters
+            var generateParameters = GenerateParameters(maxTokens: loadedConfig?.maxGenerationLength,
+                                                        maxKVSize: loadedConfig?.contextLength,
+                                                        temperature: samplerSettings.temperature,
+                                                        topP: samplerSettings.topP,
+                                                        topK: Int(samplerSettings.topK),
+                                                        minP: samplerSettings.minP,
+                                                        repetitionPenalty: samplerSettings.repeatPenalty,
+                                                        repetitionContextSize: Int(samplerSettings.repeatLastN),
+                                                        presencePenalty: samplerSettings.presencePenalty,
+                                                        presenceContextSize: Int(samplerSettings.repeatLastN),
+                                                        frequencyPenalty: samplerSettings.freqPenalty,
+                                                        frequencyContextSize: Int(samplerSettings.repeatLastN))
+            if generateParameters.maxTokens != nil && generateParameters.maxTokens! < 1 {
+                generateParameters.maxTokens = nil
+            }
+
+            // now create the actual chat session itself and reset some internal tracking
             chatSession = ChatSession(model,
                                       instructions: systemMessage,
                                       history: mlxMessages,
@@ -185,8 +195,34 @@ class MLXBackend: InferenceBackend {
             chatSessionSignature = newSessionSignature
             internalLastPromptTokenCount = 0
         } else {
-            // we're going to reuse the session, but we need to remove any system messages in the history we're using
-            chatSession?.instructions = nil
+            if let session = chatSession {
+                // we're going to reuse the session, but we need to remove any system messages in the history we're using
+                session.instructions = nil
+                
+                // reseed the RNG if necessary
+                if lastSeed == nil || samplerSettings.magic_seed != lastSeed {
+                    let seed = samplerSettings.magic_seed == 0
+                        ? UInt64(Date.timeIntervalSinceReferenceDate * 1000)
+                        : UInt64(samplerSettings.magic_seed)
+                    MLX.seed(seed)
+                    lastSeed = samplerSettings.magic_seed
+                }
+             
+                // also make sure to update the sampler settings
+                if let config = loadedConfig {
+                    session.generateParameters.maxTokens = config.maxGenerationLength > 0 ? config.maxGenerationLength : nil
+                }
+                session.generateParameters.temperature = samplerSettings.temperature
+                session.generateParameters.topP = samplerSettings.topP
+                session.generateParameters.topK = Int(samplerSettings.topK)
+                session.generateParameters.minP = samplerSettings.minP
+                session.generateParameters.repetitionPenalty = samplerSettings.repeatPenalty
+                session.generateParameters.repetitionContextSize = Int(samplerSettings.repeatLastN)
+                session.generateParameters.presencePenalty = samplerSettings.presencePenalty
+                session.generateParameters.presenceContextSize = Int(samplerSettings.repeatLastN)
+                session.generateParameters.frequencyPenalty = samplerSettings.freqPenalty
+                session.generateParameters.frequencyContextSize = Int(samplerSettings.repeatLastN)
+            }
         }
         
         // This returns AsyncThrowingStream<String, Error>

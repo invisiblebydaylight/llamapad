@@ -103,25 +103,6 @@ enum LlamaError: Error, LocalizedError {
     }
 }
 
-struct SamplerSettings : Codable {
-    var temperature: Float = 0.7
-    var topK: Int32 = 40
-    var topP: Float = 0.95
-    var minP: Float = 0.05
-    var xtcThreshold: Float = 0.1
-    var xtcProbability: Float = 0.0
-    var xtcMinKeep: Int = 1
-    var dryMultiplier: Float = 0.0
-    var dryBase: Float = 1.75
-    var dryAllowedLen: Int32 = 2
-    var dryPenaltyLastN: Int32 = 0
-    var repeatPenalty: Float = 1.05
-    var repeatLastN: Int32 = 2048
-    var freqPenalty: Float = 0.0
-    var presencePenalty: Float = 0.0
-    var magic_seed: UInt32 = 0
-}
-
 actor LlamaContext: Sendable {
     var isDone: Bool = false
     let contextLength: UInt32
@@ -133,7 +114,6 @@ actor LlamaContext: Sendable {
     private var sampling: UnsafeMutablePointer<llama_sampler>?
     private var batch: llama_batch?
     private var residentTokens: [llama_token]
-    private var samplerSettings: SamplerSettings
 
     // this variable is used to store temporarily invalid cchars
     private var temporary_invalid_cchars: [CChar]
@@ -146,48 +126,65 @@ actor LlamaContext: Sendable {
     // with a call to completionInit()
     private var currentTokenCount: Int32 = 0
     
-    init(model: OpaquePointer, context: OpaquePointer, contextLength: UInt32, samplerSettings: SamplerSettings) {
+    init(model: OpaquePointer, context: OpaquePointer, contextLength: UInt32) {
         self.contextLength = contextLength
         self.model = model
         self.context = context
-        self.samplerSettings = samplerSettings
         self.residentTokens = []
         self.temporary_invalid_cchars = []
         self.vocab = llama_model_get_vocab(model)
-        let sparams = llama_sampler_chain_default_params()
-        self.sampling = llama_sampler_chain_init(sparams)
-        
-        let n_ctx_train = llama_model_n_ctx_train(model)
-        
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_penalties(
-            samplerSettings.repeatLastN,
-            samplerSettings.repeatPenalty,
-            samplerSettings.freqPenalty,
-            samplerSettings.presencePenalty))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_dry(
-            vocab,
-            n_ctx_train,
-            samplerSettings.dryMultiplier,
-            samplerSettings.dryBase,
-            samplerSettings.dryAllowedLen,
-            samplerSettings.dryPenaltyLastN,
-            nil, //TODO: support sequence breakers
-            0))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_top_k(samplerSettings.topK))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_top_p(samplerSettings.topP, 1))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_min_p(samplerSettings.minP, 1))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_xtc(
-            samplerSettings.xtcProbability,
-            samplerSettings.xtcThreshold,
-            samplerSettings.xtcMinKeep,
-            0))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_temp(samplerSettings.temperature))
-        llama_sampler_chain_add(self.sampling, llama_sampler_init_dist(
-            samplerSettings.magic_seed == 0 ? LLAMA_DEFAULT_SEED : samplerSettings.magic_seed))
     }
     
     deinit{
         LlamaContext.forceUnload(sampler: sampling, context: context, model: model)
+    }
+    
+    /// used internally by `buildSamplerChain` to see if there's any difference from the last sampler settings
+    /// before rebuilding the whole sampler chain
+    private var lastSamplerSettings: SamplerSettings? = nil
+    
+    func buildSamplerChain(from settings: SamplerSettings) {
+        // we only rebuild if the sampler settings change
+        guard lastSamplerSettings != settings else { return }
+
+        // free any existing sampler object
+        if sampling != nil {
+            llama_sampler_free(sampling)
+            lastSamplerSettings = nil
+        }
+
+        let sparams = llama_sampler_chain_default_params()
+        sampling = llama_sampler_chain_init(sparams)
+        
+        let n_ctx_train = llama_model_n_ctx_train(model)
+        
+        llama_sampler_chain_add(sampling, llama_sampler_init_penalties(
+            settings.repeatLastN,
+            settings.repeatPenalty,
+            settings.freqPenalty,
+            settings.presencePenalty))
+        llama_sampler_chain_add(sampling, llama_sampler_init_dry(
+            vocab,
+            n_ctx_train,
+            settings.dryMultiplier,
+            settings.dryBase,
+            settings.dryAllowedLen,
+            settings.dryPenaltyLastN,
+            nil, //TODO: support sequence breakers
+            0))
+        llama_sampler_chain_add(sampling, llama_sampler_init_top_k(settings.topK))
+        llama_sampler_chain_add(sampling, llama_sampler_init_top_p(settings.topP, 1))
+        llama_sampler_chain_add(sampling, llama_sampler_init_min_p(settings.minP, 1))
+        llama_sampler_chain_add(sampling, llama_sampler_init_xtc(
+            settings.xtcProbability,
+            settings.xtcThreshold,
+            settings.xtcMinKeep,
+            0))
+        llama_sampler_chain_add(sampling, llama_sampler_init_temp(settings.temperature))
+        llama_sampler_chain_add(sampling, llama_sampler_init_dist(
+            settings.magic_seed == 0 ? LLAMA_DEFAULT_SEED : settings.magic_seed))
+
+        lastSamplerSettings = settings
     }
     
     /// this function forces the deallocation of the held memory for the model and its context.
@@ -220,7 +217,6 @@ actor LlamaContext: Sendable {
         path: String,
         offloadCount: Int32,
         contextLength: UInt32,
-        samplerSettings: SamplerSettings,
         kvCacheType: KVCacheType = .f16)
     async throws -> LlamaContext {
         let cacheType = kvCacheType.ggmlType
@@ -256,7 +252,7 @@ actor LlamaContext: Sendable {
                     throw LlamaError.contextInitFailed
                 }
                 
-                return LlamaContext(model: model, context: ctx, contextLength: contextLength, samplerSettings: samplerSettings)
+                return LlamaContext(model: model, context: ctx, contextLength: contextLength)
             }
         }
         return try await initTask.value

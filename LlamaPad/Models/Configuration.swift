@@ -25,6 +25,25 @@ struct TTSConfiguration: Codable {
     var language: String = "en"
 }
 
+struct SamplerSettings : Codable, Equatable {
+    var temperature: Float = 0.7
+    var topK: Int32 = 40
+    var topP: Float = 0.95
+    var minP: Float = 0.05
+    var xtcThreshold: Float = 0.1
+    var xtcProbability: Float = 0.0
+    var xtcMinKeep: Int = 1
+    var dryMultiplier: Float = 0.0
+    var dryBase: Float = 1.75
+    var dryAllowedLen: Int32 = 2
+    var dryPenaltyLastN: Int32 = 0
+    var repeatPenalty: Float = 1.05
+    var repeatLastN: Int32 = 2048
+    var freqPenalty: Float = 0.0
+    var presencePenalty: Float = 0.0
+    var magic_seed: UInt32 = 0
+}
+
 class AppConfiguration: ObservableObject, Codable {
     @Published var backendType: InferenceBackendType = .llamaCPP
     @Published var modelPaths: [String] = []

@@ -290,7 +290,8 @@ class AppState: ObservableObject {
                 messages: messageLog,
                 systemMessage: currentConversation?.systemMessage,
                 isContinuation: isContinue,
-                maxTokens: modelConfig.maxGenerationLength
+                maxTokens: modelConfig.maxGenerationLength,
+                samplerSettings: modelConfig.customSampler
             )
                         
             // generate tokens and update UI incrementally
