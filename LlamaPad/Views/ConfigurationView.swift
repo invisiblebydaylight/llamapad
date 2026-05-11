@@ -111,7 +111,7 @@ struct ConfigurationView: View {
                 try PersistenceService.saveConfiguration(draftConfig)
                 if isModelReloadNeeded {
                     // here we unload and just let the user load back up when ready
-                    await appState.backend?.unload()
+                    await appState.unloadModel()
                 }
                 
                 if appState.modelConfig!.tts.isEnabled == false {

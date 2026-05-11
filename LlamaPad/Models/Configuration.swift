@@ -70,7 +70,8 @@ class AppConfiguration: ObservableObject, Codable {
     func requiresReload(comparedTo other: AppConfiguration?) -> Bool {
         guard let other = other else { return true }
         
-        return self.modelPaths != other.modelPaths ||
+        return self.backendType != other.backendType ||
+               self.modelPaths != other.modelPaths ||
                self.contextLength != other.contextLength ||
                self.layerCountToOffload != other.layerCountToOffload ||
                self.kvCacheType != other.kvCacheType
