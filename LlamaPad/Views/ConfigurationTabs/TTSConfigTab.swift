@@ -117,7 +117,7 @@ struct TTSConfigTab: View {
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
 
                 if draftConfig.tts.engine == .qwen3 {
-                    Section("Voice Cloning") {
+                    VStack(spacing: 8) {
                         HStack {
                             Text("Reference Audio")
                             Spacer()
@@ -200,9 +200,7 @@ struct TTSConfigTab: View {
                 )
                 #else
                 let bookmarkData = try url.bookmarkData(
-                    options: pickerTarget == .model ?
-                        .withSecurityScope :
-                        .securityScopeAllowOnlyReadAccess,
+                    options: .minimalBookmark,
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )

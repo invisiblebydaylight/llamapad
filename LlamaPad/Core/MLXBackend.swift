@@ -5,6 +5,11 @@ import MLXLLM
 import MLXLMTransformers
 import MLX
 
+private func logMemoryUsage(_ prefix: String) {
+    let snapshot = Memory.snapshot()
+    print("\(prefix) | MLX Memory: \(snapshot.description)")
+}
+
 /// this struct gets built to act as a String representation of the KV cache and gets
 /// used to test if a new ChatSession needs to be created.
 private struct SessionSignature: Equatable {
@@ -104,13 +109,18 @@ class MLXBackend: InferenceBackend {
         // providing easier to use tokenizer from that library.
         loadedModel = try await loadModelContainer(from: modelDirectoryURL)
         loadedConfig = config
+        logMemoryUsage("Memory usage after loading")
     }
     
     func unload() async {
         loadedModel = nil
+        chatSession = nil
+        chatSessionSignature = nil
     }
     func shutdown() {
         loadedModel = nil
+        chatSession = nil
+        chatSessionSignature = nil
     }
     
     func countTokens(for text: String) async -> Int {
@@ -140,7 +150,7 @@ class MLXBackend: InferenceBackend {
             throw InferenceError.generationFailed("Not at least 2 messages (one for user, one for AI).")
         }
         
-        // FIXME: continuation support doesn't fully work
+        // NOTE: continuation support doesn't fully work
         var prunedMessages = messages
         if isContinuation == false {
             // let go of the AI one, but keep the user one
