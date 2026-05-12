@@ -389,7 +389,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadActual;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -456,7 +456,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadActual;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
