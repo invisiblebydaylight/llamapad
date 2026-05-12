@@ -291,10 +291,6 @@ class MLXBackend: InferenceBackend {
                             system: systemMessage,
                             messages: updatedMessages
                         )
-                    } else {
-                        // make sure to erase the session and signature if we didn't complete the generation
-                        self.chatSession = nil
-                        self.chatSessionSignature = nil
                     }
                     
                     continuation.finish()

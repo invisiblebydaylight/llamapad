@@ -317,6 +317,7 @@ actor LlamaContext: Sendable {
                 residentTokens.removeSubrange(commonPrefixCount...)
             } else {
                 // partial removal failed, so nuke the whole thing
+                print("Warning: partial removal of KV cache failed, so a full reprocessing is required!")
                 _ = llama_memory_seq_rm(mem, 0, 0, -1)
                 residentTokens.removeAll()
                 commonPrefixCount = 0
