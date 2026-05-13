@@ -4,6 +4,7 @@ import SwiftUI
 enum TTSEngine: String, Codable, CaseIterable {
     case kokoro = "Kokoro"
     case qwen3 = "Qwen3-TTS"
+    case chatterbox = "Chatterbox"
 }
 
 enum InferenceBackendType: String, Codable, CaseIterable {
@@ -23,6 +24,8 @@ struct TTSConfiguration: Codable {
     var autoPlayEnabled: Bool = false
     var voice: String = ""
     var language: String = "en"
+    var cfg: Float? = 0.5
+    var emotion: Float? = 0.0
 }
 
 struct SamplerSettings : Codable, Equatable {

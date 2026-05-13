@@ -88,7 +88,7 @@ struct TTSConfigTab: View {
                     }
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
-                } else {
+                } else if draftConfig.tts.engine  == .qwen3 {
                     HStack {
                         Text("Voice Description")
                         Spacer()
@@ -109,14 +109,14 @@ struct TTSConfigTab: View {
                         .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .frame(width:200)
-                        .help(draftConfig.tts.engine == .kokoro ?
+                        .help(draftConfig.tts.engine != .qwen3 ?
                               "Language code (e.g., en, es, fr, ja, ko, zh)" : "Language (e.g. 'English')"
                         )
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
-                .disabled(!draftConfig.tts.isEnabled)
-                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
-
-                if draftConfig.tts.engine == .qwen3 {
+                
+                if draftConfig.tts.engine == .qwen3 || draftConfig.tts.engine == .chatterbox {
                     VStack(spacing: 8) {
                         HStack {
                             Text("Reference Audio")
@@ -136,14 +136,16 @@ struct TTSConfigTab: View {
                             .buttonStyle(.bordered)
                         }
                         
-                        HStack {
-                            Text("Reference Text")
-                            Spacer()
-                            TextField("", text: $draftConfig.tts.refAudioText)
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(minWidth:200, maxWidth:300)
-                                .help("Transcription of what is being said in the reference audio file.")
+                        if draftConfig.tts.engine == .qwen3 {
+                            HStack {
+                                Text("Reference Text")
+                                Spacer()
+                                TextField("", text: $draftConfig.tts.refAudioText)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("Transcription of what is being said in the reference audio file.")
+                            }
                         }
                         
                         if draftConfig.tts.refAudioPath != nil {
@@ -161,6 +163,41 @@ struct TTSConfigTab: View {
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
+                
+                if draftConfig.tts.engine == .chatterbox {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("CFG Weight")
+                                .help("Pacing and stability control")
+                            Spacer()
+                            Text(String(format: "%.2f", draftConfig.tts.cfg ?? 0.5))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                        Slider(value: Binding<Float>(
+                            get: { draftConfig.tts.cfg ?? 0.5 },
+                            set: { draftConfig.tts.cfg = $0 }
+                        ), in: 0.0...1.0)
+
+                        HStack {
+                            Text("Emotion")
+                                .help("Expressiveness intensity")
+                            Spacer()
+                            Text(String(format: "%.2f", draftConfig.tts.emotion ?? 0.0))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                        Slider(value: Binding<Float>(
+                            get: { draftConfig.tts.emotion ?? 0.0 },
+                            set: { draftConfig.tts.emotion = $0 }
+                        ), in: 0.0...1.0)
+                    }
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+                }
+
             }
         }
         .formStyle(.grouped)

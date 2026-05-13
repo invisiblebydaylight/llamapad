@@ -46,7 +46,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
-* Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines. This means that support for multiple engines will be enabled. Currently there is: Kokoro and Qwen3-TTS.
+* Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines. This means that support for multiple engines will be enabled. Currently there is: [Kokoro](https://huggingface.co/mlx-community/Kokoro-82M-bf16), [Qwen3-TTS](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) (Base, CustomVoice and VoiceDesigner) and Chatterbox ([Chatterbox-Turbo](https://huggingface.co/mlx-community/chatterbox-turbo-fp16) seems to work better than the full version).
 * Support for MLX models has landed! It might still be rough around the edges as it's a new backend. To support having a new backend implementation, a common protocol has been developed and utilized.
 * Performance metrics are now recorded for each message and shown on mouse hover (macOS) or swipe (iOS).
 * Added Gemma-4 thinking tag delimiter detection as well as the `[think]` and `[/think]` tags some Mistral models use.

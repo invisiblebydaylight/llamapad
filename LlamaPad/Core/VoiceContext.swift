@@ -85,6 +85,15 @@ class VoiceContext: ObservableObject {
             tts = try await KokoroModel.fromModelDirectory(modelDirectory, textProcessor: processor)
         case .qwen3:
             tts = try await Qwen3TTSModel.fromModelDirectory(modelDirectory)
+        case .chatterbox:
+            let chatter = try await ChatterboxModel.fromModelDirectory(modelDirectory, hfToken: nil)
+            if let emotion = config.emotion {
+                chatter.emotionAdvOverride = emotion
+            }
+            if let cfg = config.cfg {
+                chatter.cfgWeightOverride = cfg
+            }
+            tts = chatter
         }
         
         isReady = true
@@ -143,6 +152,16 @@ class VoiceContext: ObservableObject {
         speakingMessageID = messageId
         defer { speakingMessageID = nil }
         
+        // make sure any generative parameters are set
+        if let chatterboxTTS = tts as? MLXAudioTTS.ChatterboxModel {
+            if let emotion = config.emotion {
+                chatterboxTTS.emotionAdvOverride = emotion
+            }
+            if let cfg = config.cfg {
+                chatterboxTTS.cfgWeightOverride = cfg
+            }
+        }
+        
         // break the text string into 'paragraphs' by splitting at newlines and trimming
         let paragraphs = text.components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).removingEmoji() }
@@ -187,7 +206,7 @@ class VoiceContext: ObservableObject {
                     voice: !config.voice.isEmpty ? config.voice : nil,
                     refAudio: refAudio,
                     refText: refAudioText,
-                    language: config.language,
+                    language: !config.language.isEmpty ? config.language : nil,
                 )
                 
                 // without clearing the cache, it would appear that memory stacks up
