@@ -37,7 +37,7 @@ struct ChatLogView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(messages) { message in
                                 MessageView(appState: appState,
                                             message: message,
