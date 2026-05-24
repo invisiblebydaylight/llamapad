@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/LiYanan2004/MarkdownView.git",
       "state" : {
-        "revision" : "0253232fc0c5f71b054cd3e98f27863508f9afca",
-        "version" : "2.6.0"
+        "revision" : "31e52d20d68a2459642d1bf33efb3c22be1b3f35",
+        "version" : "2.6.1"
       }
     },
     {
@@ -141,8 +141,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-jinja.git",
       "state" : {
-        "revision" : "0aeefadec459ce8e11a333769950fb86183aca43",
-        "version" : "2.3.5"
+        "revision" : "0b67ecb79139f6addef8699eff3622808aa6c7dc",
+        "version" : "2.3.6"
       }
     },
     {
