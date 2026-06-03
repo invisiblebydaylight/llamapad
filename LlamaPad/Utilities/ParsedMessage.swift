@@ -6,11 +6,15 @@ struct ParsedMessage {
     
     static func parse(_ content: String) -> ParsedMessage {
         for pattern in ThinkingPattern.all {
-            guard let openingRange = content.range(of: pattern.opening) else { continue }
+            guard let openingRange = content.range(
+                of: pattern.opening,
+                options: .caseInsensitive
+            ) else { continue }
             
             // Check for complete block
             if let closingRange = content.range(
                 of: pattern.closing,
+                options: .caseInsensitive,
                 range: openingRange.upperBound..<content.endIndex
             ) {
                 let thinking = String(content[openingRange.upperBound..<closingRange.lowerBound])
