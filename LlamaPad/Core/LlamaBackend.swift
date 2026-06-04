@@ -348,10 +348,8 @@ class LlamaBackend : InferenceBackend {
                     //print("DEBUG: PROMPT->>\n\(prompt ?? "<NULL>")\n<<-END")
                     
                     // check to see if we have any thinking tags inserted by the Jinja template
-                    let detectedTag = ThinkingPattern.all.first { pattern in
-                        prompt!.trimmingSuffixWhitespace().hasSuffix(pattern.opening)
-                    }?.opening
-
+                    let trimmedPrompt = prompt!.trimmingSuffixWhitespace()
+                    let detectedTag = ThinkingPattern.all.first { $0.appearsAtEnd(of: trimmedPrompt) }?.opening
                     return PromptResult(prompt: prompt!, prefilledText: detectedTag)
                 } catch {
                     throw InferenceError.promptBuildFailed("Failed to render jinja template: \(error.localizedDescription)")

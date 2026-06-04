@@ -11,4 +11,8 @@ struct ThinkingPattern {
         ThinkingPattern(opening: "<|channel>thought", closing: "<channel|>"),
         ThinkingPattern(opening: "[think]", closing: "[/think]")
     ]
+    
+    func appearsAtEnd(of text: String) -> Bool {
+        text.lowercased().hasSuffix(opening.lowercased())
+    }
 }
