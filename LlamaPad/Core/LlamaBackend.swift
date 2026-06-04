@@ -133,21 +133,21 @@ class LlamaBackend : InferenceBackend {
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
-                  maxTokens: Int,
-                  samplerSettings: SamplerSettings
+                  settings: GenerationSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error> {
         // ensure that we have our sampler chain built correctly
-        await llamaContext?.buildSamplerChain(from: samplerSettings)
+        await llamaContext?.buildSamplerChain(from: settings.samplerSettings)
         
         // making sure this is set before building the prompt is important
         // because it's used for sliding context management.
-        await llamaContext?.setNumberToPredict(maxTokens)
+        await llamaContext?.setNumberToPredict(settings.maxTokens)
         
         // do all prompt prep *before* opening the pipe.
         // if prompt building fails, we throw here, not inside the stream.
         let promptResult = try await buildPrompt(messages: messages,
-                                           systemMessage: systemMessage,
-                                           isContinuation: isContinuation)
+                                            systemMessage: systemMessage,
+                                           isContinuation: isContinuation,
+                                                 settings: settings)
 
         // return the live pipe.
         return AsyncThrowingStream { continuation in
@@ -213,10 +213,10 @@ class LlamaBackend : InferenceBackend {
     // prepares messages for prompt by removing thinking blocks and filtering by context size.
     // will return an empty array if no config or model is loaded.
     private func prepareMessagesForPrompt(messages: [Message],
-                                          systemMessage: String?
+                                          systemMessage: String?,
+                                          settings: GenerationSettings
     )
     async -> [(sender: MessageSender, content: String)] {
-        guard let modelConfig = loadedConfig else { return [] }
         guard let llamaContext = llamaContext else { return [] }
         let contextLength = Int(llamaContext.contextLength)
         
@@ -232,13 +232,13 @@ class LlamaBackend : InferenceBackend {
         let numToPredict = await Int(llamaContext.numToPredict)
         var generationBudget = numToPredict
         if generationBudget == 0 {
-            generationBudget = max(0, modelConfig.reservedContextBuffer)
+            generationBudget = max(0, settings.reservedContextBuffer)
         }
         let safetyThreshold = contextLength - generationBudget
         
         // safetyThreshold exceeded, so pick a new anchor with some 'runway' space
         // so that the KV cache isn't constantly regenerating
-        let runwayTarget = max(0, modelConfig.contextRunway)
+        let runwayTarget = max(0, settings.contextRunway)
         let limitWithRunway = max(0, safetyThreshold - runwayTarget)
         
         // get the length of the system message as well
@@ -319,19 +319,19 @@ class LlamaBackend : InferenceBackend {
     /// if it's unable to build a prompt, an error is thrown.
     private func buildPrompt(messages: [Message],
                              systemMessage: String?,
-                             isContinuation: Bool) async throws -> PromptResult {
-        guard let config = loadedConfig else {
-            throw InferenceError.notLoaded("No configuration loaded.")
-        }
+                             isContinuation: Bool,
+                             settings: GenerationSettings) async throws -> PromptResult {
         guard let llamaContext else {
             throw InferenceError.notLoaded("No model loaded.")
         }
         
-        // or if it continues to get managed in AppState
-        let processedMessages = await prepareMessagesForPrompt(messages: messages, systemMessage: systemMessage)
+        let processedMessages = await prepareMessagesForPrompt(
+            messages: messages,
+            systemMessage: systemMessage,
+            settings: settings)
         
         // add the system prompt this way.
-        if config.chatTemplate == nil { // `nil` is jinja/autodetect
+        if settings.chatTemplate == nil { // `nil` is jinja/autodetect
             if let jinjaStr = await llamaContext.getChatTemplate() {
                 var messages = processedMessages
                 if let sysMsg = systemMessage, sysMsg.isEmpty == false {
@@ -343,7 +343,7 @@ class LlamaBackend : InferenceBackend {
                     let prompt = try templater.render(
                         messages: messages,
                         addAssistant: !isContinuation,
-                        enableThinking: config.enableThinking)
+                        enableThinking: settings.enableThinking)
                     
                     //print("DEBUG: PROMPT->>\n\(prompt ?? "<NULL>")\n<<-END")
                     
@@ -364,11 +364,11 @@ class LlamaBackend : InferenceBackend {
             let prompt = try await llamaContext.formatPrompt(
                 messages: processedMessages,
                 systemMessage: systemMessage,
-                template: config.chatTemplate,
+                template: settings.chatTemplate,
                 isContinue: isContinuation)
             return PromptResult(prompt: prompt, prefilledText: nil)
         } catch {
-            throw InferenceError.promptBuildFailed("Failed to format the prompt using template: \(config.chatTemplate ?? "Unknown")")
+            throw InferenceError.promptBuildFailed("Failed to format the prompt using template: \(settings.chatTemplate ?? "Unknown")")
         }
     }
 }

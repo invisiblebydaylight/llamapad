@@ -137,8 +137,7 @@ class MLXBackend: InferenceBackend {
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
-                  maxTokens: Int,
-                  samplerSettings: SamplerSettings) async throws
+                  settings: GenerationSettings) async throws
     -> AsyncThrowingStream<GenerationChunk, Error> {
         guard let model = loadedModel else {
             throw InferenceError.notLoaded("MLX backend not loaded")
@@ -159,7 +158,10 @@ class MLXBackend: InferenceBackend {
         
         // we go through and select only the messages that fit within a given context log.
         // NOTE: for the MLX backend, we don't have a sliding context window yet
-        prunedMessages = await prepareMessagesForBackend(messages: prunedMessages, systemMessage: systemMessage)
+        prunedMessages = await prepareMessagesForBackend(
+            messages: prunedMessages,
+            systemMessage: systemMessage,
+            settings: settings)
         let targetMsg = prunedMessages.popLast()
         
         // build the chat history
@@ -180,18 +182,18 @@ class MLXBackend: InferenceBackend {
         // check to see if we need to create a new session
         if chatSession == nil || !(chatSessionSignature?.checkSignature(against: newSessionSignature) ?? false) {
             // use our sampler settings provided to generate a new set of parameters
-            var generateParameters = GenerateParameters(maxTokens: loadedConfig?.maxGenerationLength,
+            var generateParameters = GenerateParameters(maxTokens: settings.maxTokens,
                                                         maxKVSize: loadedConfig?.contextLength,
-                                                        temperature: samplerSettings.temperature,
-                                                        topP: samplerSettings.topP,
-                                                        topK: Int(samplerSettings.topK),
-                                                        minP: samplerSettings.minP,
-                                                        repetitionPenalty: samplerSettings.repeatPenalty,
-                                                        repetitionContextSize: Int(samplerSettings.repeatLastN),
-                                                        presencePenalty: samplerSettings.presencePenalty,
-                                                        presenceContextSize: Int(samplerSettings.repeatLastN),
-                                                        frequencyPenalty: samplerSettings.freqPenalty,
-                                                        frequencyContextSize: Int(samplerSettings.repeatLastN))
+                                                        temperature: settings.samplerSettings.temperature,
+                                                        topP: settings.samplerSettings.topP,
+                                                        topK: Int(settings.samplerSettings.topK),
+                                                        minP: settings.samplerSettings.minP,
+                                                        repetitionPenalty: settings.samplerSettings.repeatPenalty,
+                                                        repetitionContextSize: Int(settings.samplerSettings.repeatLastN),
+                                                        presencePenalty: settings.samplerSettings.presencePenalty,
+                                                        presenceContextSize: Int(settings.samplerSettings.repeatLastN),
+                                                        frequencyPenalty: settings.samplerSettings.freqPenalty,
+                                                        frequencyContextSize: Int(settings.samplerSettings.repeatLastN))
             if generateParameters.maxTokens != nil && generateParameters.maxTokens! < 1 {
                 generateParameters.maxTokens = nil
             }
@@ -201,7 +203,7 @@ class MLXBackend: InferenceBackend {
                                       instructions: systemMessage,
                                       history: mlxMessages,
                                       generateParameters: generateParameters,
-                                      additionalContext: ["enable_thinking" : loadedConfig?.enableThinking ?? false])
+                                      additionalContext: ["enable_thinking" : settings.enableThinking])
             chatSessionSignature = newSessionSignature
             internalLastPromptTokenCount = 0
         } else {
@@ -210,28 +212,27 @@ class MLXBackend: InferenceBackend {
                 session.instructions = nil
                 
                 // reseed the RNG if necessary
-                if lastSeed == nil || samplerSettings.magic_seed != lastSeed {
-                    let seed = samplerSettings.magic_seed == 0
+                if lastSeed == nil || settings.samplerSettings.magic_seed != lastSeed {
+                    let seed = settings.samplerSettings.magic_seed == 0
                         ? UInt64(Date.timeIntervalSinceReferenceDate * 1000)
-                        : UInt64(samplerSettings.magic_seed)
+                    : UInt64(settings.samplerSettings.magic_seed)
                     MLX.seed(seed)
-                    lastSeed = samplerSettings.magic_seed
+                    lastSeed = settings.samplerSettings.magic_seed
                 }
              
                 // also make sure to update the sampler settings
-                if let config = loadedConfig {
-                    session.generateParameters.maxTokens = config.maxGenerationLength > 0 ? config.maxGenerationLength : nil
-                }
-                session.generateParameters.temperature = samplerSettings.temperature
-                session.generateParameters.topP = samplerSettings.topP
-                session.generateParameters.topK = Int(samplerSettings.topK)
-                session.generateParameters.minP = samplerSettings.minP
-                session.generateParameters.repetitionPenalty = samplerSettings.repeatPenalty
-                session.generateParameters.repetitionContextSize = Int(samplerSettings.repeatLastN)
-                session.generateParameters.presencePenalty = samplerSettings.presencePenalty
-                session.generateParameters.presenceContextSize = Int(samplerSettings.repeatLastN)
-                session.generateParameters.frequencyPenalty = samplerSettings.freqPenalty
-                session.generateParameters.frequencyContextSize = Int(samplerSettings.repeatLastN)
+                session.generateParameters.maxTokens = settings.maxTokens > 0 ? settings.maxTokens : nil
+                session.generateParameters.temperature = settings.samplerSettings.temperature
+                session.generateParameters.topP = settings.samplerSettings.topP
+                session.generateParameters.topK = Int(settings.samplerSettings.topK)
+                session.generateParameters.minP = settings.samplerSettings.minP
+                session.generateParameters.repetitionPenalty = settings.samplerSettings.repeatPenalty
+                session.generateParameters.repetitionContextSize = Int(settings.samplerSettings.repeatLastN)
+                session.generateParameters.presencePenalty = settings.samplerSettings.presencePenalty
+                session.generateParameters.presenceContextSize = Int(settings.samplerSettings.repeatLastN)
+                session.generateParameters.frequencyPenalty = settings.samplerSettings.freqPenalty
+                session.generateParameters.frequencyContextSize = Int(settings.samplerSettings.repeatLastN)
+                session.additionalContext = ["enable_thinking" : settings.enableThinking]
             }
         }
         
@@ -316,7 +317,8 @@ class MLXBackend: InferenceBackend {
     
     private func prepareMessagesForBackend(
         messages: [Message],
-        systemMessage: String?
+        systemMessage: String?,
+        settings: GenerationSettings
     ) async -> [Message] {
         // for now, estimate how many tokens the prompt format adds
         let promptTokenBaggageEst = 10
@@ -325,11 +327,9 @@ class MLXBackend: InferenceBackend {
         guard loadedModel != nil else { return messages }
         
         let effectiveContext = config.contextLength
-        let generationBudget = config.maxGenerationLength > 0
-            ? config.maxGenerationLength
-            : config.reservedContextBuffer
+        let generationBudget = settings.maxTokens > 0 ? settings.maxTokens : settings.reservedContextBuffer
         let safetyThreshold = effectiveContext - generationBudget
-        let runwayTarget = max(0, config.contextRunway)
+        let runwayTarget = max(0, settings.contextRunway)
         let limitWithRunway = max(0, safetyThreshold - runwayTarget)
 
         // Tokenize system message to reserve its budget

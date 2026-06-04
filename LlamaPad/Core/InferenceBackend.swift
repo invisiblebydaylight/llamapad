@@ -17,6 +17,15 @@ enum InferenceError: Error, LocalizedError {
     }
 }
 
+struct GenerationSettings {
+    let maxTokens: Int
+    let enableThinking: Bool
+    let samplerSettings: SamplerSettings
+    let reservedContextBuffer: Int
+    let contextRunway: Int
+    let chatTemplate: String?
+}
+
 @MainActor
 protocol InferenceBackend: AnyObject {
     var isLoaded: Bool { get }
@@ -36,8 +45,7 @@ protocol InferenceBackend: AnyObject {
         messages: [Message],
         systemMessage: String?,
         isContinuation: Bool,
-        maxTokens: Int,
-        samplerSettings: SamplerSettings
+        settings: GenerationSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error>
 }
 

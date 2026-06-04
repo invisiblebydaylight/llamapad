@@ -290,10 +290,16 @@ class AppState: ObservableObject {
                 messages: messageLog,
                 systemMessage: currentConversation?.systemMessage,
                 isContinuation: isContinue,
-                maxTokens: modelConfig.maxGenerationLength,
-                samplerSettings: modelConfig.customSampler
+                settings: GenerationSettings (
+                    maxTokens: modelConfig.maxGenerationLength,
+                    enableThinking: modelConfig.enableThinking,
+                    samplerSettings: modelConfig.customSampler,
+                    reservedContextBuffer: modelConfig.reservedContextBuffer,
+                    contextRunway: modelConfig.contextRunway,
+                    chatTemplate: modelConfig.chatTemplate
+                )
             )
-                        
+            
             // generate tokens and update UI incrementally
             self.reportProcessStatus(progress: nil, status: nil)
             
