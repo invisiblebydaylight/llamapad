@@ -33,48 +33,64 @@ struct NavigationBarView: View {
 
             Spacer()
             
-            if let config = appState.modelConfig,
-               !config.modelPaths.isEmpty,
-               let path = config.modelPaths.first,
-               !path.isEmpty
+            if let config = appState.modelConfig
             {
-                let modelDisplayName = URL(fileURLWithPath: path).lastPathComponent
-                Text(modelDisplayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(path)
-            } else {
-                Text("No Model Loaded")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                if !config.isRemote {
+                    if !config.modelPaths.isEmpty,
+                       let path = config.modelPaths.first,
+                       !path.isEmpty
+                    {
+                        let modelDisplayName = URL(fileURLWithPath: path).lastPathComponent
+                        Text(modelDisplayName)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .help(path)
+                    } else {
+                        Text("No Model Loaded")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                } else {
+                    Text(config.apiModelName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(config.apiEndpoint)
+                }
             }
             
             Spacer()
             
-            Button(action: {
-                // this button acts as a toggle and should load the model if not loaded
-                // and free it otherwise if it already is loaded.
-                if !isLoaded{
-                    Task {
-                        await appState.reloadModel()
+            // we only show the load/eject button on local models
+            if let config = appState.modelConfig,
+               !config.isRemote
+            {
+                Button(action: {
+                    // this button acts as a toggle and should load the model if not loaded
+                    // and free it otherwise if it already is loaded.
+                    if !isLoaded{
+                        Task {
+                            await appState.reloadModel()
+                        }
+                    } else {
+                        Task {
+                            await appState.unloadModel()
+                        }
                     }
-                } else {
-                    Task {
-                        await appState.unloadModel()
+                }) {
+                    VStack(spacing: 2){
+                        Image(systemName: isLoaded ? "eject" : "arrow.down.circle")
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                            .padding(4)
+                        Text(isLoaded ? "Eject" : "Load")
                     }
                 }
-            }) {
-                VStack(spacing: 2){
-                    Image(systemName: isLoaded ? "eject" : "arrow.down.circle")
-                        .font(.title2)
-                        .foregroundColor(.primary)
-                        .padding(4)
-                    Text(isLoaded ? "Eject" : "Load")
-                }
+                .disabled(appState.isBusy)
             }
-            .disabled(appState.isBusy)
             
             Button(action: onSettingsTap) {
                 VStack(spacing: 2) {

@@ -20,6 +20,8 @@ enum InferenceError: Error, LocalizedError {
 struct GenerationSettings {
     let maxTokens: Int
     let enableThinking: Bool
+    let reasoningEffort: ReasoningEffort    // only for .remoteApi backend
+    let remoteSamplers: Set<String>         // only for .remoteApi backend
     let samplerSettings: SamplerSettings
     let reservedContextBuffer: Int
     let contextRunway: Int

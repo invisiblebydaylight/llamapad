@@ -243,7 +243,9 @@ struct MessageView: View {
         Group {
             if let stats = message.stats, showTray {
                 HStack(spacing: 8) {
-                    Label("\(stats.promptTps, specifier: "%.1f") t/s", systemImage: "bolt.fill")
+                    if let promptTps = stats.promptTps {
+                        Label("\(promptTps, specifier: "%.1f") t/s", systemImage: "bolt.fill")
+                    }
                     Label("\(stats.generationTps, specifier: "%.1f") t/s", systemImage: "sparkles")
                     
                     if let modelName = stats.modelName {

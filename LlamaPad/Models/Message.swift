@@ -11,7 +11,7 @@ enum MessageSender: String, Codable {
 // keep track of performance stats for the message
 struct MessageStats: Codable {
     let modelName: String?
-    let promptTps: Double
+    let promptTps: Double?
     let generationTps: Double
 }
 

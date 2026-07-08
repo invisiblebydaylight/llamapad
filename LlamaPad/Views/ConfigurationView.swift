@@ -76,7 +76,7 @@ struct ConfigurationView: View {
                             Text("Save Changes")
                         }
                     }
-                    .disabled(draftConfig.modelPaths.isEmpty || appState.isBusy)
+                    .disabled(appState.isBusy || (draftConfig.isRemote ? draftConfig.apiEndpoint.isEmpty : draftConfig.modelPaths.isEmpty))
                     .buttonStyle(.borderedProminent)
                     .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }

@@ -106,8 +106,10 @@ class AppState: ObservableObject {
         // spawn the correct concrete backend
         let newBackend: InferenceBackend = if config.backendType == .llamaCPP {
             LlamaBackend()
-        } else {
+        } else if config.backendType == .mlx {
             MLXBackend()
+        } else {
+            RemoteAPIBackend()
         }
         
         do {
@@ -293,6 +295,8 @@ class AppState: ObservableObject {
                 settings: GenerationSettings (
                     maxTokens: modelConfig.maxGenerationLength,
                     enableThinking: modelConfig.enableThinking,
+                    reasoningEffort: modelConfig.apiReasoningEffort,
+                    remoteSamplers: modelConfig.apiEnabledSamplers,
                     samplerSettings: modelConfig.customSampler,
                     reservedContextBuffer: modelConfig.reservedContextBuffer,
                     contextRunway: modelConfig.contextRunway,
@@ -346,19 +350,37 @@ class AppState: ObservableObject {
         let t_heat = Double(Int64(timeToFirstToken) - Int64(t_start)) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
         let t_generation = Double(t_end - timeToFirstToken) / NS_PER_S
-        let prompt_tps = Double(actualTokensProcessed) / t_heat
-        let generation_tps = Double(generatedTokens-1) / t_generation
+        let promptTps: Double?
+        if modelConfig.isRemote {
+            // We can't accurately measure server-side prefill speed from the client.
+            // t_heat includes network latency + thinking tokens + server queue time.
+            promptTps = nil
+        } else {
+            promptTps = actualTokensProcessed > 0 ? Double(actualTokensProcessed) / t_heat : 0
+        }
+        let generationTps = Double(generatedTokens-1) / t_generation
         
         // record the performance stats in the message
-        let modelName = modelConfig.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        let modelName: String
+        if modelConfig.isRemote {
+            modelName = modelConfig.apiModelName.isEmpty ? "api" : modelConfig.apiModelName
+        } else {
+            modelName = modelConfig.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        }
         aiMessage.stats = MessageStats(
-            modelName: modelName, promptTps: prompt_tps, generationTps: generation_tps
+            modelName: modelName,
+            promptTps: promptTps,
+            generationTps: generationTps
         )
         
         print("Info: Generation complete (\(modelName)):")
         print("  Time to first token: \(t_heat)s")
-        print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
-        print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
+        if let prompt_tps = promptTps {
+            print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
+        } else {
+            print("  Prompt tokens: \(actualTokensProcessed)")
+        }
+        print("  Generation speeds: \(generatedTokens) tokens ; \(generationTps) t/s")
         
         // make sure to serialize as the final step so nothing's lost
         saveChatLog()
