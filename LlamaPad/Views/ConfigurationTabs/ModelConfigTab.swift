@@ -83,6 +83,30 @@ struct ModelConfigTab: View {
             return AnyView(EmptyView())
         }
     }
+
+    private var activeProfileBinding: Binding<APIProfile>? {
+        guard let id = draftConfig.activeProfileId,
+              let idx = draftConfig.apiProfiles.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+        return Binding(
+            get: { draftConfig.apiProfiles[idx] },
+            set: { draftConfig.apiProfiles[idx] = $0 }
+        )
+    }
+
+    private func addProfile() {
+        let newProfile = APIProfile(name: "New Profile")
+        draftConfig.apiProfiles.append(newProfile)
+        draftConfig.activeProfileId = newProfile.id
+    }
+
+    private func deleteProfile() {
+        guard let id = draftConfig.activeProfileId,
+              let idx = draftConfig.apiProfiles.firstIndex(where: { $0.id == id }) else { return }
+        draftConfig.apiProfiles.remove(at: idx)
+        draftConfig.activeProfileId = draftConfig.apiProfiles.first?.id
+    }
     
     var body: some View {
         let backend = draftConfig.backendType
@@ -98,9 +122,6 @@ struct ModelConfigTab: View {
                                 draftConfig.backendType = newValue
                                 draftConfig.modelPaths.removeAll()
                                 draftConfig.modelBookmarks.removeAll()
-                                draftConfig.apiKey.removeAll()
-                                draftConfig.apiEndpoint.removeAll()
-                                draftConfig.apiModelName.removeAll()
                             }
                         }
                     )) {
@@ -143,33 +164,64 @@ struct ModelConfigTab: View {
                         }
                     } else { // remote API config...
                         HStack() {
-                            Text("API Endpoint:")
-                            Spacer()
-                            TextField("", text: $draftConfig.apiEndpoint)
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(minWidth:200, maxWidth:300)
-                                .help("The URL to the server that will be used to generate text.")
+                            Picker("Profile", selection: $draftConfig.activeProfileId) {
+                                ForEach(draftConfig.apiProfiles) { profile in
+                                    Text(profile.name).tag(profile.id as UUID?)
+                                }
+                            }
+                            
+                            Button(action: addProfile) {
+                                Image(systemName: "plus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Create a new profile")
+
+                            Button(action: deleteProfile) {
+                                Image(systemName: "minus.circle.fill")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(draftConfig.apiProfiles.isEmpty || draftConfig.activeProfileId == nil)
+                            .help("Delete the active profile")
+                        }.padding(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
+
+                        if let binding = activeProfileBinding {
+                            HStack() {
+                                Text("Profile Name:")
+                                Spacer()
+                                TextField("", text: binding.name)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The user friendly name for this group of settings.")
+                            }
+                            HStack() {
+                                Text("API Endpoint:")
+                                Spacer()
+                                TextField("", text: binding.endpoint)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The URL to the server that will be used to generate text.")
+                            }
+                            HStack() {
+                                Text("API Key:")
+                                Spacer()
+                                SecureField("", text: binding.apiKey)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The key needed to authenticate with the server, if any.")
+                            }
+                            HStack() {
+                                Text("Model Name:")
+                                Spacer()
+                                TextField("", text: binding.modelName)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The model name recognized by the server to use for text generation.")
+                            }
                         }
-                        HStack() {
-                            Text("API Key:")
-                            Spacer()
-                            SecureField("", text: $draftConfig.apiKey)
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(minWidth:200, maxWidth:300)
-                                .help("The key needed to authenticate with the server, if any.")
-                        }
-                        HStack() {
-                            Text("Model Name:")
-                            Spacer()
-                            TextField("", text: $draftConfig.apiModelName)
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(minWidth:200, maxWidth:300)
-                                .help("The model name recognized by the server to use for text generation.")
-                        }
-                        
                     }
                 }
                 

@@ -53,7 +53,8 @@ struct NavigationBarView: View {
                             .foregroundStyle(.tertiary)
                     }
                 } else {
-                    Text(config.apiModelName)
+                    let displayText = "[\(config.activeProfile?.name ?? "Unknown")] \(config.apiModelName)"
+                    Text(displayText)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)

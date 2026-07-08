@@ -51,13 +51,41 @@ struct SamplerSettings : Codable, Equatable {
     var magic_seed: UInt32 = 0
 }
 
+struct APIProfile: Codable, Identifiable {
+    let id: UUID                /// Profile ID
+    var name: String            /// User-facing name like "openrouter"
+    var endpoint: String        /// URL to chat/completions
+    var apiKey: String          /// API key to use for requests
+    var modelName: String       /// Model to use by the server
+
+    init(name: String, endpoint: String = "", apiKey: String = "", modelName: String = "") {
+        self.id = UUID()
+        self.name = name
+        self.endpoint = endpoint
+        self.apiKey = apiKey
+        self.modelName = modelName
+    }
+}
+
 class AppConfiguration: ObservableObject, Codable {
     @Published var backendType: InferenceBackendType = .llamaCPP
     @Published var modelPaths: [String] = []
     @Published var modelBookmarks: [Data] = []
-    @Published var apiEndpoint: String = ""
-    @Published var apiKey: String = ""
-    @Published var apiModelName: String = ""
+    @Published var activeProfileId: UUID? = nil
+    @Published var apiProfiles: [APIProfile] = []
+    var activeProfile: APIProfile? {
+        guard let id = activeProfileId else { return nil }
+        return apiProfiles.first(where: { $0.id == id })
+    }
+    var apiEndpoint: String {
+        return activeProfile?.endpoint ?? ""
+    }
+    var apiKey: String {
+        return activeProfile?.apiKey ?? ""
+    }
+    var apiModelName: String {
+        return activeProfile?.modelName ?? ""
+    }
     @Published var apiEnabledSamplers: Set<String> = []
     @Published var chatTemplate: String? = nil
     @Published var enableThinking: Bool = true
@@ -72,7 +100,7 @@ class AppConfiguration: ObservableObject, Codable {
     @Published var tts: TTSConfiguration = TTSConfiguration()
 
     enum CodingKeys: String, CodingKey {
-        case backendType, modelPaths, modelBookmarks, apiEndpoint, apiKey, apiModelName, apiEnabledSamplers, chatTemplate, enableThinking, apiReasoningEffort, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
+        case backendType, modelPaths, modelBookmarks, activeProfileId, apiProfiles, apiEnabledSamplers, chatTemplate, enableThinking, apiReasoningEffort, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
     }
     
     var isRemote: Bool { backendType == .remoteAPI }
@@ -100,9 +128,8 @@ class AppConfiguration: ObservableObject, Codable {
         backendType = try container.decodeIfPresent(InferenceBackendType.self, forKey: .backendType) ?? .llamaCPP
         modelPaths = try container.decode([String].self, forKey: .modelPaths)
         modelBookmarks = try container.decode([Data].self, forKey: .modelBookmarks)
-        apiEndpoint = try container.decodeIfPresent(String.self, forKey: .apiEndpoint) ?? ""
-        apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
-        apiModelName = try container.decodeIfPresent(String.self, forKey: .apiModelName) ?? ""
+        activeProfileId = try container.decodeIfPresent(UUID.self, forKey: .activeProfileId)
+        apiProfiles = try container.decodeIfPresent([APIProfile].self, forKey: .apiProfiles) ?? []
         apiEnabledSamplers = try container.decodeIfPresent(Set<String>.self, forKey: .apiEnabledSamplers) ?? []
         chatTemplate = try container.decodeIfPresent(String.self, forKey: .chatTemplate)
         enableThinking = try container.decodeIfPresent(Bool.self, forKey: .enableThinking) ?? true
@@ -122,9 +149,8 @@ class AppConfiguration: ObservableObject, Codable {
         self.backendType = other.backendType
         self.modelPaths = other.modelPaths
         self.modelBookmarks = other.modelBookmarks
-        self.apiKey = other.apiKey
-        self.apiEndpoint = other.apiEndpoint
-        self.apiModelName = other.apiModelName
+        self.activeProfileId = other.activeProfileId
+        self.apiProfiles = other.apiProfiles
         self.apiEnabledSamplers = other.apiEnabledSamplers
         self.chatTemplate = other.chatTemplate
         self.enableThinking = other.enableThinking
@@ -144,9 +170,8 @@ class AppConfiguration: ObservableObject, Codable {
         try container.encode(backendType, forKey: .backendType)
         try container.encode(modelPaths, forKey: .modelPaths)
         try container.encode(modelBookmarks, forKey: .modelBookmarks)
-        try container.encode(apiKey, forKey: .apiKey)
-        try container.encode(apiEndpoint, forKey: .apiEndpoint)
-        try container.encode(apiModelName, forKey: .apiModelName)
+        try container.encode(activeProfileId, forKey: .activeProfileId)
+        try container.encode(apiProfiles, forKey: .apiProfiles)
         try container.encode(apiEnabledSamplers, forKey: .apiEnabledSamplers)
         try container.encode(chatTemplate, forKey: .chatTemplate)
         try container.encode(enableThinking, forKey: .enableThinking)

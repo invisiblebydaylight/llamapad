@@ -109,7 +109,7 @@ Qwen3 TTS Usage Guide:
 
 ### Remote API Setup
 
-Configure the remote API backend in the Model tab by selecting "api" as the backend type.
+Multiple profiles are supported to facilitate quick switching between providers. Configure the remote API backend in the Model tab by selecting "api" as the backend type. Then add a new **profile** by clicking the plus button on the 'Profile' picker row. Once created, the new profile needs the following things set:
 
 * Endpoint URL: The base URL of an OpenAI-compatible API endpoint (e.g. `https://openrouter.ai/api/v1` or `http://localhost:8080/v1`).
 * API Key: Bearer token for authentication. May be left blank for local servers that don't require authentication.
