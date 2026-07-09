@@ -57,6 +57,7 @@ struct APIProfile: Codable, Identifiable {
     var endpoint: String        /// URL to chat/completions
     var apiKey: String          /// API key to use for requests
     var modelName: String       /// Model to use by the server
+    var modelHistory: [String] = [] /// Models used successfully in the past
 
     init(name: String, endpoint: String = "", apiKey: String = "", modelName: String = "") {
         self.id = UUID()
@@ -64,6 +65,31 @@ struct APIProfile: Codable, Identifiable {
         self.endpoint = endpoint
         self.apiKey = apiKey
         self.modelName = modelName
+        self.modelHistory = []
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, endpoint, apiKey, modelName, modelHistory
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        endpoint = try c.decode(String.self, forKey: .endpoint)
+        apiKey = try c.decode(String.self, forKey: .apiKey)
+        modelName = try c.decode(String.self, forKey: .modelName)
+        modelHistory = try c.decodeIfPresent([String].self, forKey: .modelHistory) ?? []
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(endpoint, forKey: .endpoint)
+        try container.encode(apiKey, forKey: .apiKey)
+        try container.encode(modelName, forKey: .modelName)
+        try container.encode(modelHistory, forKey: .modelHistory)
     }
 }
 
@@ -121,7 +147,29 @@ class AppConfiguration: ObservableObject, Codable {
                self.apiKey != other.apiKey ||
                self.apiModelName != other.apiModelName
     }
+   
+    // gets the best history match from the current APIProfile for a given `input` string
+    func bestModelMatch(for input: String) -> String? {
+        guard !input.isEmpty,
+              let id = activeProfileId,
+              let profile = apiProfiles.first(where: { $0.id == id }) else { return nil }
+        return profile.modelHistory
+            .filter { $0.hasPrefix(input) && $0 != input }
+            .sorted()
+            .first
+    }
 
+    // record model name in active profile's history
+    func addModelToProfileHistory() {
+        if let id = self.activeProfileId,
+           let idx = self.apiProfiles.firstIndex(where: { $0.id == id }) {
+            let name = self.apiProfiles[idx].modelName
+            if !name.isEmpty && !self.apiProfiles[idx].modelHistory.contains(name) {
+                self.apiProfiles[idx].modelHistory.append(name)
+            }
+        }
+    }
+    
     required convenience init(from decoder: Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)

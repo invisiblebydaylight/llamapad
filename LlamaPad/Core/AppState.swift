@@ -388,8 +388,15 @@ class AppState: ObservableObject {
             touchConversation(id: id)
         }
         
-        // call the callback, but only if we didn't cancel it
+        
+        // call the callback and update model list, but only if we didn't cancel it
         if !self.shouldStopGenerating {
+            // update and persist the updated model use history to disk
+            modelConfig.addModelToProfileHistory()
+            if let config = self.modelConfig {
+                try? PersistenceService.saveConfiguration(config)
+            }
+
             self.onGenerationFinished?(aiMessage)
         }
     }

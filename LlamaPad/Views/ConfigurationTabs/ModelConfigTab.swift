@@ -220,6 +220,19 @@ struct ModelConfigTab: View {
                                     .textFieldStyle(.roundedBorder)
                                     .frame(minWidth:200, maxWidth:300)
                                     .help("The model name recognized by the server to use for text generation.")
+                                    .onKeyPress(.tab) {
+                                        if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
+                                            binding.modelName.wrappedValue = suggestion
+                                        }
+                                        return .handled
+                                    }
+                            }
+                            if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
+                                HStack(){
+                                    Text("Tab to complete: \(suggestion)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
