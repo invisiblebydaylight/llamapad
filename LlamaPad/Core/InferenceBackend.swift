@@ -37,6 +37,10 @@ protocol InferenceBackend: AnyObject {
     /// returns nil if no generation has occurred or the backend doesn't track it.
     var lastPromptTokenCount: Int? { get }
     
+    /// returns the message IDs that were included in the last prompt sent to the backend.
+    /// returns nil if no generation has occurred or the backend doesn't track it.
+    var lastIncludedMessageIDs: [UUID]? { get }
+
     func load(from config: AppConfiguration) async throws
     func unload() async
     func shutdown()

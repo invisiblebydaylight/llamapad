@@ -21,6 +21,9 @@ class LlamaBackend : InferenceBackend {
     private var contextAnchorID: UUID?
     
     private var internalLastPromptTokenCount: Int? = nil
+    
+    private var internalLastIncludedMessageIDs: [UUID]? = nil
+    var lastIncludedMessageIDs: [UUID]? { internalLastIncludedMessageIDs }
 
     var isLoaded: Bool { llamaContext != nil }
     var contextLimit: Int { Int(llamaContext?.contextLength ?? 0) }
@@ -217,6 +220,7 @@ class LlamaBackend : InferenceBackend {
                                           settings: GenerationSettings
     )
     async -> [(sender: MessageSender, content: String)] {
+        internalLastIncludedMessageIDs = []
         guard let llamaContext = llamaContext else { return [] }
         let contextLength = Int(llamaContext.contextLength)
         
@@ -297,6 +301,9 @@ class LlamaBackend : InferenceBackend {
         if !messages.isEmpty && contextAnchorID != messages[newStartIndex].id {
             contextAnchorID = messages[newStartIndex].id
         }
+        
+        // capture the IDs of the messages we're including
+        internalLastIncludedMessageIDs = messages[newStartIndex...].map { $0.id }
 
         // convert our stable 'window' into the messageLog into the returned format
         return messages[newStartIndex...].compactMap { message in

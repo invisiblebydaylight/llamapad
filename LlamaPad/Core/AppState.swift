@@ -37,6 +37,8 @@ class AppState: ObservableObject {
     /// describes the current processing task (e.g. "Processing Prompt...")
     @Published var processingStatus: String? = nil  
 
+    @Published var lastIncludedMessageIDs: [UUID]? = nil
+    
     /// a callback that gets called on completion, if supplied, with the new message that was generated.
     /// this callback is skipped if the generation is cancled by the user with `shouldStopGenerating`
     var onGenerationFinished: ((Message) -> Void)?
@@ -148,12 +150,14 @@ class AppState: ObservableObject {
     func selectConversation(_ id: UUID?) {
         self.currentConversationID = id
         self.messageLog = []
+        self.lastIncludedMessageIDs = nil
 
         // load the new conversation's chat log
         if let id = id {
             do {
                 let newLog = try ConversationService.loadChatLog(for: id)
                 self.messageLog = newLog
+                self.lastIncludedMessageIDs = Array(newLog.suffix(50).map { $0.id })
             } catch {
                 self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
             }
@@ -303,6 +307,9 @@ class AppState: ObservableObject {
                     chatTemplate: modelConfig.chatTemplate
                 )
             )
+            
+            // store the message IDs that were included in the prompt sent out for generation.
+            self.lastIncludedMessageIDs = backend.lastIncludedMessageIDs
             
             // generate tokens and update UI incrementally
             self.reportProcessStatus(progress: nil, status: nil)

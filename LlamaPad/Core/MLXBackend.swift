@@ -57,6 +57,9 @@ class MLXBackend: InferenceBackend {
     /// the cache space, which would be inaccurate. Instead, we just disable this number for this backend.
     var lastPromptTokenCount: Int? { nil }
 
+    private var internalLastIncludedMessageIDs: [UUID]? = nil
+    var lastIncludedMessageIDs: [UUID]? { internalLastIncludedMessageIDs }
+
     /// used by `prepareMessageForBackend` to figure out where to start the message log
     /// to send to the backend engine. that way we can constrict the log a little more, pin it to start
     /// at a message and then let it grow without having to risk full context reprocessing with every message.
@@ -323,6 +326,7 @@ class MLXBackend: InferenceBackend {
         // for now, estimate how many tokens the prompt format adds
         let promptTokenBaggageEst = 10
         
+        internalLastIncludedMessageIDs = []
         guard let config = loadedConfig else { return messages }
         guard loadedModel != nil else { return messages }
         
@@ -383,7 +387,10 @@ class MLXBackend: InferenceBackend {
             print("ERROR: startIndex out of bounds for prepareMessagesForBackend; returning empty array.")
             return []
         }
-        return Array(messages[startIndex...])
+        
+        let result = Array(messages[startIndex...])
+        internalLastIncludedMessageIDs = result.map { $0.id }
+        return result
     }
 
 }

@@ -5,7 +5,8 @@ import Combine
 class RemoteAPIBackend: InferenceBackend {
     private var loadedConfig: AppConfiguration?
     private var internalLastPromptTokenCount: Int? = nil
-    
+    private var internalLastIncludedMessageIDs: [UUID]? = nil
+
     private var contextAnchorID: UUID? = nil
 
     
@@ -19,6 +20,10 @@ class RemoteAPIBackend: InferenceBackend {
     
     var lastPromptTokenCount: Int? {
         return internalLastPromptTokenCount
+    }
+    
+    var lastIncludedMessageIDs: [UUID]? {
+        internalLastIncludedMessageIDs
     }
     
     func load(from config: AppConfiguration) async throws {
@@ -287,6 +292,8 @@ class RemoteAPIBackend: InferenceBackend {
         settings: GenerationSettings
     ) async -> [Message] {
         let promptTokenBaggageEst = 10
+        internalLastIncludedMessageIDs = []
+        
         guard let config = loadedConfig else { return messages }
 
         let effectiveContext = config.contextLength
@@ -344,7 +351,11 @@ class RemoteAPIBackend: InferenceBackend {
         }
 
         guard startIndex < messages.count else { return [] }
-        return Array(messages[startIndex...])
+
+        // this is where we log what message ids were included with this result
+        let result = Array(messages[startIndex...])
+        internalLastIncludedMessageIDs = result.map { $0.id }
+        return result
     }
 
 }
