@@ -343,6 +343,27 @@ struct ModelConfigTab: View {
                                }
                        }
                     }
+                    HStack {
+                        DisclosureGroup("Custom Request Body") {
+                            TextEditor(text: Binding(
+                                get: { activeProfileBinding?.wrappedValue.customBody ?? "" },
+                                set: { activeProfileBinding?.wrappedValue.customBody = $0.isEmpty ? nil : $0 }
+                            ))
+                            .font(.system(.body, design: .monospaced))
+                            .frame(minHeight: 100)
+                            .overlay(alignment: .topLeading) {
+                                if (activeProfileBinding?.wrappedValue.customBody ?? "").isEmpty {
+                                    Text("Custom JSON merged into request body...\ne.g. {\"plugins\": [{\"id\": \"web\", \"engine\": \"native\" }]}")
+                                        .font(.system(.body, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                        .allowsHitTesting(false)
+                                        .padding(.top, 8)
+                                        .padding(.leading, 4)
+                                }
+                            }
+                        }
+
+                    }
                 }
             }
             

@@ -58,6 +58,7 @@ struct APIProfile: Codable, Identifiable {
     var apiKey: String          /// API key to use for requests
     var modelName: String       /// Model to use by the server
     var modelHistory: [String] = [] /// Models used successfully in the past
+    var customBody: String? = nil /// JSON to get overlaid on the request body sent to API
 
     init(name: String, endpoint: String = "", apiKey: String = "", modelName: String = "") {
         self.id = UUID()
@@ -112,6 +113,11 @@ class AppConfiguration: ObservableObject, Codable {
     var apiModelName: String {
         return activeProfile?.modelName ?? ""
     }
+    var apiCustomBody: String? {
+        guard let id = activeProfileId,
+              let profile = apiProfiles.first(where: { $0.id == id }) else { return nil }
+        return profile.customBody
+    }
     @Published var apiEnabledSamplers: Set<String> = []
     @Published var chatTemplate: String? = nil
     @Published var enableThinking: Bool = true
@@ -145,7 +151,8 @@ class AppConfiguration: ObservableObject, Codable {
                self.kvCacheType != other.kvCacheType ||
                self.apiEndpoint != other.apiEndpoint ||
                self.apiKey != other.apiKey ||
-               self.apiModelName != other.apiModelName
+               self.apiModelName != other.apiModelName ||
+               self.apiCustomBody != other.apiCustomBody
     }
    
     // gets the best history match from the current APIProfile for a given `input` string

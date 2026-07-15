@@ -111,6 +111,16 @@ class RemoteAPIBackend: InferenceBackend {
         if rs.contains("xtc_threshold") { body["xtc_threshold"] = s.xtcThreshold }
         if rs.contains("seed") { body["seed"] = s.magic_seed }
         
+        // overlay any custom JSON over the body
+        if let customJSON = config.apiCustomBody?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !customJSON.isEmpty,
+           let customData = customJSON.data(using: .utf8),
+           let customDict = try? JSONSerialization.jsonObject(with: customData) as? [String: Any] {
+            for (key, value) in customDict {
+                body[key] = value
+            }
+        }
+        
         // build the URL — endpoint should be like "https://example.com/v1"
         guard let url = URL(string: config.apiEndpoint)?
             .appendingPathComponent("chat/completions") else {
