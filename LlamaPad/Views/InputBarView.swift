@@ -1,10 +1,16 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct InputBarView: View {
     @ObservedObject var appState: AppState
     @Binding var inputText: String
     
-    var onSendUserMessage: (String) -> Void
+    @State private var draftAttachments: [Attachment] = []
+    @State private var showingFilePicker = false
+    @State private var showingTokenWarning = false
+    @State private var pendingAttachment: Attachment? = nil
+
+    var onSendUserMessage: (String, [Attachment]) -> Void
     var onGenerateAiResponse: (Bool) -> Void
 
     /// represents the action that this view's button should take when pressed
@@ -79,67 +85,154 @@ struct InputBarView: View {
     }
 
     var body: some View {
-        HStack {
-            TextEditor(text: $inputText)
-                .padding(4)
-                .frame(minHeight: 40, maxHeight: 120)
-                .fixedSize(horizontal: false, vertical: true)
-                .scrollContentBackground(.hidden)
+        VStack {
+            HStack {
+                TextEditor(text: $inputText)
+                    .padding(4)
+                    .frame(minHeight: 40, maxHeight: 120)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .scrollContentBackground(.hidden)
 #if os(macOS)
-                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
 #else
-                .background(Color(.secondarySystemBackground).opacity(0.5))
+                    .background(Color(.secondarySystemBackground).opacity(0.5))
 #endif
-                .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.4), lineWidth: 1))
-                .onKeyPress(keys: [.return]) { press in
-                    if press.modifiers.contains(.command) {
-                        // don't send empty messages
-                        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.4), lineWidth: 1))
+                    .onKeyPress(keys: [.return]) { press in
+                        if press.modifiers.contains(.command) {
+                            // don't send empty messages
+                            guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                                return .handled
+                            }
+                            
+                            let textToSend = inputText
+                            let attachments = draftAttachments
+                            inputText = ""
+                            draftAttachments.removeAll()
+                            
+                            // dispatch asynchronously to avoid publishing changes during view update
+                            DispatchQueue.main.async {
+                                onSendUserMessage(textToSend, attachments)
+                            }
+                            
                             return .handled
                         }
-
-                        let textToSend = inputText
-                        inputText = ""
-                        
-                        // dispatch asynchronously to avoid publishing changes during view update
-                        DispatchQueue.main.async {
-                            onSendUserMessage(textToSend)
-                        }
-
-                        return .handled
+                        return .ignored
                     }
-                    return .ignored
+                
+                Button(action: {
+                    showingFilePicker = true
+                }) {
+                    Image(systemName: "paperclip")
+                        .font(.title2)
+                        .padding(10)
+                        .background(appState.isGenerating ? Color.red : Color.blue)
+                        .clipShape(Circle())
+                        .foregroundColor(.white)
+                        .opacity(appState.shouldStopGenerating ? 0.6 : 1.0)
                 }
-            
-            Button(action: {
-                switch nextAction {
-                case .StopGeneration:
-                    // if we're genererating already, the button stops the current generation
-                    appState.shouldStopGenerating = true
-                case .SendUserMessage:
-                    // we do that by calling the action passed from the parent.
-                    onSendUserMessage(inputText)
-                    inputText = ""
-                case .GenerateNewResponse:
-                    onGenerateAiResponse(false)
-                case .Continue:
-                    onGenerateAiResponse(true)
+                .buttonStyle(.borderless)
+                .padding(.leading, 4)
+                .disabled(appState.isGenerating)
+                .help("attach a file to this message")
+                
+                Button(action: {
+                    switch nextAction {
+                    case .StopGeneration:
+                        // if we're genererating already, the button stops the current generation
+                        appState.shouldStopGenerating = true
+                    case .SendUserMessage:
+                        // we do that by calling the action passed from the parent.
+                        let attachments = draftAttachments
+                        draftAttachments.removeAll()
+                        onSendUserMessage(inputText, attachments)
+                        inputText = ""
+                    case .GenerateNewResponse:
+                        onGenerateAiResponse(false)
+                    case .Continue:
+                        onGenerateAiResponse(true)
+                    }
+                }) {
+                    Image(systemName: buttonIcon)
+                        .font(.title2)
+                        .padding(10)
+                        .background(appState.isGenerating ? Color.red : Color.blue)
+                        .clipShape(Circle())
+                        .foregroundColor(.white)
+                        .opacity(appState.shouldStopGenerating ? 0.6 : 1.0)
                 }
-            }) {
-                Image(systemName: buttonIcon)
-                    .font(.title2)
-                    .padding(10)
-                    .background(appState.isGenerating ? Color.red : Color.blue)
-                    .clipShape(Circle())
-                    .foregroundColor(.white)
-                    .opacity(appState.shouldStopGenerating ? 0.6 : 1.0)
+                .padding(.leading, 4)
+                .help(buttonTooltip)
+                .animation(.easeInOut, value: appState.shouldStopGenerating)
             }
-            .padding(.leading, 4)
-            .help(buttonTooltip)
-            .animation(.easeInOut, value: appState.shouldStopGenerating)
+            .padding()
+            .buttonStyle(.borderless)
         }
-        .padding()
-        .buttonStyle(.borderless)
+        .fileImporter(
+            isPresented: $showingFilePicker,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in handleFileSelect(result) }
+        .alert("Large File Warning", isPresented: $showingTokenWarning) {
+            Button("Attach Anyway") {
+                if let att = pendingAttachment { draftAttachments.append(att) }
+                pendingAttachment = nil
+            }
+            Button("Cancel", role: .cancel) { pendingAttachment = nil }
+        } message: {
+            if let att = pendingAttachment {
+                Text("This file is approximately \(att.tokenEstimate) tokens, which is more than 25% of your context window. Attaching it may consume most of your available context.")
+            }
+        }
+
+        // chip row of draft attachements
+        if !draftAttachments.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 6) {
+                    ForEach(draftAttachments) { att in
+                        AttachmentChipView(
+                            attachment: att,
+                            onRemove: { draftAttachments.removeAll { $0.id == att.id } }
+                        )
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .frame(height: 28)
+            .padding(8)
+        }
     }
+    
+    private func handleFileSelect(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            Task { @MainActor in
+                for url in urls {
+                    let gotAccess = url.startAccessingSecurityScopedResource()
+                    defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
+                    
+                    guard let data = try? Data(contentsOf: url),
+                          let text = String(data: data, encoding: .utf8) else {
+                        appState.reportError("Could not read \(url.lastPathComponent) as text.")
+                        continue
+                    }
+                    
+                    let estimate = await (appState.backend?.countTokens(for: text) ?? text.count / 4)
+                    let attachment = Attachment(filename: url.lastPathComponent, textContent: text, tokenEstimate: estimate)
+                    
+                    let threshold = (appState.modelConfig?.contextLength ?? 4096) / 4
+                    if estimate > threshold {
+                        pendingAttachment = attachment
+                        showingTokenWarning = true
+                    } else {
+                        draftAttachments.append(attachment)
+                    }
+                }
+            }
+        case .failure(let error):
+            appState.reportError("File picker error: \(error.localizedDescription)")
+        }
+    }
+
 }

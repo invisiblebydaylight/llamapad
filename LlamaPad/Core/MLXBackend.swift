@@ -170,8 +170,7 @@ class MLXBackend: InferenceBackend {
         // build the chat history
         var mlxMessages = [Chat.Message]()
         mlxMessages = prunedMessages.compactMap { msg -> Chat.Message? in
-            let content = msg.parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = msg.contentWithAttachments
             guard !content.isEmpty else { return nil }
             return Chat.Message(role: msg.sender == .user
                                 ? Chat.Message.Role.user
@@ -241,7 +240,7 @@ class MLXBackend: InferenceBackend {
         
         // This returns AsyncThrowingStream<String, Error>
         // but we need it to be AsyncThrowingStream<GenerationChunk, Error> ...
-        let mlxStream = chatSession!.streamDetails(to: targetMsg?.parsedContent.responseContent ??
+        let mlxStream = chatSession!.streamDetails(to: targetMsg?.contentWithAttachments ??
                                               "Tell the user the software they use is bugged because the AI cannot see the message to respond to.",
                                               images: [], videos: [])
         
@@ -346,8 +345,7 @@ class MLXBackend: InferenceBackend {
         var safetyThresholdBreached = false
         
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
-            let content = messages[i].parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = messages[i].contentWithAttachments
             guard !content.isEmpty else { continue }
             
             let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
@@ -371,8 +369,7 @@ class MLXBackend: InferenceBackend {
         
         if safetyThresholdBreached {
             while startIndex < messages.count && totalTokens > limitWithRunway {
-                let content = messages[startIndex].parsedContent.responseContent
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let content = messages[startIndex].contentWithAttachments
                 let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
                 totalTokens -= msgTokens
                 startIndex += 1

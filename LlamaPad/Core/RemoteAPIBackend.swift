@@ -73,8 +73,7 @@ class RemoteAPIBackend: InferenceBackend {
         }
         for msg in prunedMessages {
             let role = msg.sender == .user ? "user" : "assistant"
-            let content = msg.parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = msg.contentWithAttachments
             guard !content.isEmpty else { continue }
             apiMessages.append(["role": role, "content": content])
         }
@@ -321,11 +320,9 @@ class RemoteAPIBackend: InferenceBackend {
         var safetyThresholdBreached = false
 
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
-            let content = messages[i].parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !content.isEmpty else { continue }
-
-            let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
+            let fullContent = messages[i].contentWithAttachments
+            guard !fullContent.isEmpty else { continue }
+            let msgTokens = await countTokens(for: fullContent) + promptTokenBaggageEst
 
             if totalTokens + msgTokens > safetyThreshold {
                 safetyThresholdBreached = true
@@ -346,8 +343,7 @@ class RemoteAPIBackend: InferenceBackend {
 
         if safetyThresholdBreached {
             while startIndex < messages.count && totalTokens > limitWithRunway {
-                let content = messages[startIndex].parsedContent.responseContent
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let content = messages[startIndex].contentWithAttachments
                 let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
                 totalTokens -= msgTokens
                 startIndex += 1

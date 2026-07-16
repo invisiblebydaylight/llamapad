@@ -343,6 +343,27 @@ struct MessageView: View {
         #endif
     }
     
+    private var AttachmentChips: some View {
+        Group {
+            if let attachments = message.attachments, !attachments.isEmpty {
+                LazyHStack(spacing: 6) {
+                    ForEach(attachments) { att in
+                        AttachmentChipView(
+                            attachment: att,
+                            onRemove: { removeAttachment(att) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+    
+    private func removeAttachment(_ attachment: Attachment) {
+        message.attachments?.removeAll { $0.id == attachment.id }
+        appState.saveChatLog()
+    }
+
+    
     var body: some View {
         HStack {
             HStack(alignment: .center, spacing: 0) {
@@ -351,12 +372,16 @@ struct MessageView: View {
                     Spacer()
                     SidecarTray
                         .padding(.trailing, 8)
-                    MessageBubbleContent
+                    VStack(alignment: .trailing, spacing: 4) {
+                        MessageBubbleContent
+                        AttachmentChips
+                    }
                 }
                 // ai message alignment
                 else {
                     VStack {
                         MessageBubbleContent
+                        AttachmentChips
                         StatsRibbon
                     }
                     SidecarTray

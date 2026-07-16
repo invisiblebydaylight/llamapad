@@ -259,7 +259,7 @@ class LlamaBackend : InferenceBackend {
 
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
             let msg = messages[i]
-            let content = msg.parsedContent.responseContent
+            let content = msg.contentWithAttachments
             let msgTokens = await countTokens(for: content) + perMessageOverhead
             
             // if budget is exceeded, pin the window to the previous message
@@ -290,7 +290,7 @@ class LlamaBackend : InferenceBackend {
             // until we're under limitWithRunway. this creates the "gap" that
             // keeps the KV cache stable for several turns before we slide again.
             while newStartIndex < messages.count && totalTokens > limitWithRunway {
-                let content = messages[newStartIndex].parsedContent.responseContent
+                let content = messages[newStartIndex].contentWithAttachments
                 let msgTokens = await countTokens(for: content) + perMessageOverhead
                 totalTokens -= msgTokens
                 newStartIndex += 1
@@ -307,7 +307,7 @@ class LlamaBackend : InferenceBackend {
 
         // convert our stable 'window' into the messageLog into the returned format
         return messages[newStartIndex...].compactMap { message in
-            let content = message.parsedContent.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = message.contentWithAttachments
             guard !content.isEmpty else { return nil }
             return (sender: message.sender, content: content)
         }
