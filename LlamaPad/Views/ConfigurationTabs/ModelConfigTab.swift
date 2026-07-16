@@ -7,6 +7,8 @@ struct ModelConfigTab: View {
     
     @State private var isAdvSamplerExpanded = false
     @State private var isRemoteSamplerExpanded = false
+    @State private var isCustomJSONExpanded = false
+    
     private let templateNames: [String] = LlamaBackend.BuiltinTemplateNames
     
     private var modelFilename: String {
@@ -344,7 +346,7 @@ struct ModelConfigTab: View {
                        }
                     }
                     HStack {
-                        DisclosureGroup("Custom Request Body") {
+                        DisclosureGroup(isExpanded: $isCustomJSONExpanded) {
                             TextEditor(text: Binding(
                                 get: { activeProfileBinding?.wrappedValue.customBody ?? "" },
                                 set: { activeProfileBinding?.wrappedValue.customBody = $0.isEmpty ? nil : $0 }
@@ -353,7 +355,7 @@ struct ModelConfigTab: View {
                             .frame(minHeight: 100)
                             .overlay(alignment: .topLeading) {
                                 if (activeProfileBinding?.wrappedValue.customBody ?? "").isEmpty {
-                                    Text("Custom JSON merged into request body...\ne.g. {\"plugins\": [{\"id\": \"web\", \"engine\": \"native\" }]}")
+                                    Text("Custom JSON merged into request body...")
                                         .font(.system(.body, design: .monospaced))
                                         .foregroundStyle(.tertiary)
                                         .allowsHitTesting(false)
@@ -362,6 +364,14 @@ struct ModelConfigTab: View {
                                 }
                             }
                         }
+                        label: {
+                           Text("Remote Body JSON Overrides")
+                               .onTapGesture {
+                                   withAnimation {
+                                       isCustomJSONExpanded.toggle()
+                                   }
+                               }
+                       }
 
                     }
                 }
