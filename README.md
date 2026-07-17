@@ -47,6 +47,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
+* Paste image support: copy an image to the clipboard and then hit `cmd-v` in the input field to attach it as an image attachment.
 * File attachements: attach text and image files to user messages; contents are injected into the prompt at the start of the message. Large file warnings prevent accidental context window exhaustion. Images are added as base64 encodes and are only currently supported by the remote API backend.
 * Added support for only showing the number of messages in the chatlog as were sent to the LLM, showing just how much the AI is able to see of the conversation with current settings. Scrolling all the way to the top shows a button that can reveal all messages.
 * Added cmd-uparrow and cmd-downarrow as two keyboard shortcuts that with the chatlog selected will navigate to the start and end.

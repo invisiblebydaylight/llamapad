@@ -84,6 +84,45 @@ struct InputBarView: View {
         inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private func handleImagePaste() -> KeyPress.Result {
+        let pb = NSPasteboard.general
+        
+        let imageTypes: [(NSPasteboard.PasteboardType, String, String)] = [
+            (.png, "image/png", "png"),
+            (.tiff, "image/png", "png")
+        ]
+        
+        for (pbType, mimeType, ext) in imageTypes {
+            guard let data = pb.data(forType: pbType) else { continue }
+            
+            var imageData = data
+            
+            if pbType == .tiff {
+                guard let nsImage = NSImage(data: data),
+                      let tiffRep = nsImage.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiffRep),
+                      let pngData = bitmap.representation(using: .png, properties: [:]) else { continue }
+                imageData = pngData
+            }
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyMMddHHmmss"
+            let filename = "Paste-\(formatter.string(from: Date())).\(ext)"
+            
+            let attachment = Attachment(
+                filename: filename,
+                imageData: imageData,
+                mimeType: mimeType,
+                tokenEstimate: 768
+            )
+            draftAttachments.append(attachment)
+            return .handled
+        }
+        
+        return .ignored
+    }
+
+    
     var body: some View {
         VStack {
             HStack {
@@ -117,6 +156,12 @@ struct InputBarView: View {
                             }
                             
                             return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress (keys: [.init("v")]) { press in
+                        if press.modifiers.contains(.command) {
+                            return handleImagePaste()
                         }
                         return .ignored
                     }
