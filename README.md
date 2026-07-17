@@ -47,7 +47,7 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ### Recent changes (newer to older):
-* File attachements: attach text files to user messages; contents are injected into the prompt at the start of the message. Large file warnings prevent accidental context window exhaustion.
+* File attachements: attach text and image files to user messages; contents are injected into the prompt at the start of the message. Large file warnings prevent accidental context window exhaustion. Images are added as base64 encodes and are only currently supported by the remote API backend.
 * Added support for only showing the number of messages in the chatlog as were sent to the LLM, showing just how much the AI is able to see of the conversation with current settings. Scrolling all the way to the top shows a button that can reveal all messages.
 * Added cmd-uparrow and cmd-downarrow as two keyboard shortcuts that with the chatlog selected will navigate to the start and end.
 * Support for remote API usage through OpenAI-compatible endpoints has been added for maximum flexibility! While it's probably obvious, note that using this backend *does* send your chatlog to whatever server you supply as an endpoint.
@@ -140,7 +140,7 @@ Note: Plain HTTP connections to local addresses (`localhost`, `127.0.0.1`, `.loc
 * The remote API backend does not support all sampler settings.
 * Self-signed HTTPS certificates are not currently supported for remote endpoints.
   Use plain HTTP for local servers or a proper TLS certificate for remote servers.
-* Attachments for messages are text-only for now; multimodal support is planned.
+* Attachments for messages are text-only except for the remote API backend which can handle image attachments as well.
 
 
 ## Future Goals

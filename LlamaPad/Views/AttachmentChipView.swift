@@ -26,10 +26,39 @@ struct AttachmentChipView: View {
         return content
     }
     
-    var body: some View {
-        HStack(spacing: 4) {
+    @ViewBuilder
+    private var chipIcon: some View {
+        if attachment.contentType == .image, let imageData = attachment.imageData {
+            #if os(macOS)
+            if let nsImage = NSImage(data: imageData) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 16, height: 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+            } else {
+                Image(systemName: "photo")
+            }
+            #else
+            if let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 16, height: 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+            } else {
+                Image(systemName: "photo")
+            }
+            #endif
+        } else {
             Image(systemName: fileIcon)
                 .font(.caption)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            chipIcon
             
             Text(attachment.filename)
                 .font(.caption)
@@ -57,23 +86,52 @@ struct AttachmentChipView: View {
         )
         .onTapGesture { showingPreview = true }
         .popover(isPresented: $showingPreview) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(attachment.filename).font(.headline)
-                    Spacer()
-                    Text("~\(attachment.tokenEstimate) tokens")
-                        .font(.caption).foregroundStyle(.secondary)
+            if attachment.contentType == .image, let imageData = attachment.imageData {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(attachment.filename).font(.headline)
+                        Spacer()
+                        Text("~\(attachment.tokenEstimate) tokens")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    #if os(macOS)
+                    if let nsImage = NSImage(data: imageData) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 400, maxHeight: 300)
+                    }
+                    #else
+                    if let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 400, maxHeight: 300)
+                    }
+                    #endif
                 }
-                ScrollView {
-                    Text(previewText)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .frame(maxWidth: 450, maxHeight: 350)
+            } else {
+                // text preview
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(attachment.filename).font(.headline)
+                        Spacer()
+                        Text("~\(attachment.tokenEstimate) tokens")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    ScrollView {
+                        Text(previewText)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 300)
                 }
-                .frame(maxHeight: 300)
+                .padding()
+                .frame(minWidth: 400, idealWidth: 500, minHeight: 200, idealHeight: 300)
             }
-            .padding()
-            .frame(minWidth: 400, idealWidth: 500, minHeight: 200, idealHeight: 300)
         }
         #if os(macOS)
         .onHover { hovering in withAnimation { isHovering = hovering } }

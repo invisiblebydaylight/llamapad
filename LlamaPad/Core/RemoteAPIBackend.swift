@@ -73,9 +73,40 @@ class RemoteAPIBackend: InferenceBackend {
         }
         for msg in prunedMessages {
             let role = msg.sender == .user ? "user" : "assistant"
-            let content = msg.contentWithAttachments
-            guard !content.isEmpty else { continue }
-            apiMessages.append(["role": role, "content": content])
+            
+            // check for image attachments — only user messages, only remote API
+            let imageAttachments = msg.sender == .user
+                ? (msg.attachments ?? []).filter { $0.contentType == .image && $0.imageData != nil }
+                : []
+            
+            if !imageAttachments.isEmpty {
+                // build the multimodal content array
+                var contentArray: [[String: Any]] = []
+                
+                // text portion first (includes text attachments via contentWithAttachments)
+                let textContent = msg.contentWithAttachments
+                if !textContent.isEmpty {
+                    contentArray.append(["type": "text", "text": textContent])
+                }
+                
+                // then images
+                for att in imageAttachments {
+                    let base64 = att.imageData!.base64EncodedString()
+                    let url = "data:\(att.mimeType);base64,\(base64)"
+                    contentArray.append([
+                        "type": "image_url",
+                        "image_url": ["url": url]
+                    ])
+                }
+                
+                guard !contentArray.isEmpty else { continue }
+                apiMessages.append(["role": role, "content": contentArray])
+            } else {
+                // standard text-only path
+                let content = msg.contentWithAttachments
+                guard !content.isEmpty else { continue }
+                apiMessages.append(["role": role, "content": content])
+            }
         }
 
         // build request body
@@ -322,7 +353,15 @@ class RemoteAPIBackend: InferenceBackend {
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
             let fullContent = messages[i].contentWithAttachments
             guard !fullContent.isEmpty else { continue }
-            let msgTokens = await countTokens(for: fullContent) + promptTokenBaggageEst
+            var msgTokens = await countTokens(for: fullContent) + promptTokenBaggageEst
+
+            // add image token estimates
+            if messages[i].sender == .user, let attachments = messages[i].attachments {
+                let imageTokens = attachments
+                    .filter { $0.contentType == .image }
+                    .reduce(0) { $0 + $1.tokenEstimate }
+                msgTokens += imageTokens
+            }
 
             if totalTokens + msgTokens > safetyThreshold {
                 safetyThresholdBreached = true
@@ -344,7 +383,15 @@ class RemoteAPIBackend: InferenceBackend {
         if safetyThresholdBreached {
             while startIndex < messages.count && totalTokens > limitWithRunway {
                 let content = messages[startIndex].contentWithAttachments
-                let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
+                var msgTokens = await countTokens(for: content) + promptTokenBaggageEst
+             
+                if messages[startIndex].sender == .user, let attachments = messages[startIndex].attachments {
+                    let imageTokens = attachments
+                        .filter { $0.contentType == .image }
+                        .reduce(0) { $0 + $1.tokenEstimate }
+                    msgTokens += imageTokens
+                }
+             
                 totalTokens -= msgTokens
                 startIndex += 1
             }

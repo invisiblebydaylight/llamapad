@@ -212,26 +212,49 @@ struct InputBarView: View {
                     let gotAccess = url.startAccessingSecurityScopedResource()
                     defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
                     
-                    guard let data = try? Data(contentsOf: url),
-                          let text = String(data: data, encoding: .utf8) else {
-                        appState.reportError("Could not read \(url.lastPathComponent) as text.")
+                    guard let data = try? Data(contentsOf: url) else {
+                        appState.reportError("Could not read \(url.lastPathComponent).")
                         continue
                     }
                     
-                    let estimate = await (appState.backend?.countTokens(for: text) ?? text.count / 4)
-                    let attachment = Attachment(filename: url.lastPathComponent, textContent: text, tokenEstimate: estimate)
-                    
-                    let threshold = (appState.modelConfig?.contextLength ?? 4096) / 4
-                    if estimate > threshold {
-                        pendingAttachment = attachment
-                        showingTokenWarning = true
+                    if let mimeType = detectImageMimeType(for: url) {
+                        // it's an image — route to image attachment
+                        let estimate = 768
+                        let attachment = Attachment(filename: url.lastPathComponent, imageData: data, mimeType: mimeType, tokenEstimate: estimate)
+                        tryAppend(attachment, estimate: estimate)
+                    } else if let text = String(data: data, encoding: .utf8) {
+                        // it's text — route to text attachment
+                        let estimate = await (appState.backend?.countTokens(for: text) ?? text.count / 4)
+                        let attachment = Attachment(filename: url.lastPathComponent, textContent: text, tokenEstimate: estimate)
+                        tryAppend(attachment, estimate: estimate)
                     } else {
-                        draftAttachments.append(attachment)
+                        appState.reportError("Could not read \(url.lastPathComponent) as text or image.")
                     }
                 }
             }
         case .failure(let error):
             appState.reportError("File picker error: \(error.localizedDescription)")
+        }
+    }
+    
+    private func tryAppend(_ attachment: Attachment, estimate: Int) {
+        let threshold = (appState.modelConfig?.contextLength ?? 4096) / 4
+        if estimate > threshold {
+            pendingAttachment = attachment
+            showingTokenWarning = true
+        } else {
+            draftAttachments.append(attachment)
+        }
+    }
+
+    private func detectImageMimeType(for url: URL) -> String? {
+        let ext = url.pathExtension.lowercased()
+        switch ext {
+        case "png": return "image/png"
+        case "jpg", "jpeg": return "image/jpeg"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        default: return nil
         }
     }
 
