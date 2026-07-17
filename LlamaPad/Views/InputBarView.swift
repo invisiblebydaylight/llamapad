@@ -230,6 +230,10 @@ struct InputBarView: View {
                 Text("This file is approximately \(att.tokenEstimate) tokens, which is more than 25% of your context window. Attaching it may consume most of your available context.")
             }
         }
+        .onDrop(of: [.fileURL, .image], isTargeted: nil) { providers in
+            handleDrop(providers)
+            return true
+        }
 
         // chip row of draft attachements
         if !draftAttachments.isEmpty {
@@ -300,6 +304,62 @@ struct InputBarView: View {
         case "gif": return "image/gif"
         case "webp": return "image/webp"
         default: return nil
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) {
+        Task { @MainActor in
+            for provider in providers {
+                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                    // file URL from Finder — resolve and route to file handler
+                    do {
+                        let urlData = try await loadData(from: provider, typeId: UTType.fileURL.identifier)
+                        guard let path = String(data: urlData, encoding: .utf8),
+                              let url = URL(string: path) else { continue }
+                        handleFileSelect(.success([url]))
+                    } catch { continue }
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    // raw image data — load and create attachment
+                    do {
+                        let data = try await loadData(from: provider, typeId: UTType.image.identifier)
+                        var imageData = data
+                        
+                        // convert TIFF to PNG if needed
+                        if let nsImage = NSImage(data: data),
+                           let tiffRep = nsImage.tiffRepresentation,
+                           let bitmap = NSBitmapImageRep(data: tiffRep),
+                           let pngData = bitmap.representation(using: .png, properties: [:]) {
+                            imageData = pngData
+                        }
+                        
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyMMddHHmmss"
+                        let filename = "Drop-\(formatter.string(from: Date())).png"
+                        
+                        let attachment = Attachment(
+                            filename: filename,
+                            imageData: imageData,
+                            mimeType: "image/png",
+                            tokenEstimate: 768
+                        )
+                        draftAttachments.append(attachment)
+                    } catch { continue }
+                }
+            }
+        }
+    }
+
+    private func loadData(from provider: NSItemProvider, typeId: String) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: typeId) { data, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let data = data {
+                    continuation.resume(returning: data)
+                } else {
+                    continuation.resume(throwing: NSError(domain: "Drop", code: 0))
+                }
+            }
         }
     }
 
