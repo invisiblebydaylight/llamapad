@@ -170,7 +170,7 @@ class RemoteAPIBackend: InferenceBackend {
         request.timeoutInterval = 600
 
         return AsyncThrowingStream { continuation in
-            let task = Task {
+            let task = Task.detached {
                 do {
                     // signal prompt processing started
                     continuation.yield(GenerationChunk(
@@ -218,7 +218,9 @@ class RemoteAPIBackend: InferenceBackend {
                         // capture usage data - openrouter format (usage) or llama.cpp format (timings)
                         if let usage = json["usage"] as? [String: Any] {
                             if let promptTokens = usage["prompt_tokens"] as? Int {
-                                internalLastPromptTokenCount = promptTokens
+                                await MainActor.run {
+                                    self.internalLastPromptTokenCount = promptTokens
+                                }
                                 // yield the updated count so AppState can record it
                                 continuation.yield(GenerationChunk(
                                     text: "",
@@ -233,7 +235,9 @@ class RemoteAPIBackend: InferenceBackend {
                             let cacheN = timings["cache_n"] as? Int ?? 0
                             let predictedN = timings["predicted_n"] as? Int ?? tokensGenerated
                             let totalPromptN = promptN + cacheN
-                            internalLastPromptTokenCount = totalPromptN
+                            await MainActor.run {
+                                self.internalLastPromptTokenCount = totalPromptN
+                            }
                             continuation.yield(GenerationChunk(
                                 text: "",
                                 isPromptProcessing: false,
@@ -283,11 +287,12 @@ class RemoteAPIBackend: InferenceBackend {
                                 firstTokenReceived = true
                                 
                                 // signal prompt processing is done
+                                let tokenCount = await MainActor.run { self.internalLastPromptTokenCount ?? 0 }
                                 continuation.yield(GenerationChunk(
                                     text: "",
                                     isPromptProcessing: false,
                                     promptProgress: 1.0,
-                                    tokensDecoded: internalLastPromptTokenCount ?? 0,
+                                    tokensDecoded: tokenCount,
                                     tokensGenerated: 0
                                 ))
                             }

@@ -1,13 +1,9 @@
 import SwiftUI
 
-
 struct ChatLogView: View {
     @ObservedObject var appState: AppState
     let messages: [Message]
 
-    /// track the current scroll task
-    @State private var scrollTask: Task<Void, Never>? = nil
-    
     /// whether or not all messages should get rendered.
     @State private var showAllMessages: Bool = false
 
@@ -62,35 +58,50 @@ struct ChatLogView: View {
     }
 
     @ViewBuilder
-    private var scrollContent: some View {
-            if !showAllMessages,
-               let includedIDs = appState.lastIncludedMessageIDs,
-               includedIDs.count < messages.count {
-                let hiddenCount = messages.count - includedIDs.count
-                Button("Load \(hiddenCount) Earlier Messages...") {
-                    showAllMessages = true
-                }
-                .padding(.vertical, 8)
-            } else {
+    private var contextToggle: some View {
+        let includedIDs = appState.lastIncludedMessageIDs
+        
+        if showAllMessages {
+            // showing everything — only offer to filter if there are actually out-of-context messages
+            if let includedIDs = includedIDs, includedIDs.count < messages.count {
                 Button("Show Only In-Context Messages...") {
                     showAllMessages = false
                 }
                 .padding(.vertical, 8)
             }
-
-         
-            ForEach(visibleMessages) { message in
-                MessageView(appState: appState,
-                            message: message,
-                            isTTSEnabled: appState.modelConfig?.tts.isEnabled ?? false)
-                .id(message.id)
+        } else {
+            // showing filtered — only offer to expand if we're actually hiding something
+            if let includedIDs = includedIDs {
+                let includedSet = Set(includedIDs)
+                let visibleCount = messages.filter {
+                    includedSet.contains($0.id) || $0.id == messages.last?.id
+                }.count
+                if visibleCount < messages.count {
+                    let hiddenCount = messages.count - visibleCount
+                    Button("Load \(hiddenCount) Earlier Messages...") {
+                        showAllMessages = true
+                    }
+                    .padding(.vertical, 8)
+                }
             }
-            
-            progressIndicator
-                        
-            // invisible anchor for scrolling
-            Color.clear.frame(height: 1).id("scrollBottom")
-            Color.clear.frame(height: 200)
+        }
+    }
+
+    @ViewBuilder
+    private var scrollContent: some View {
+        contextToggle
+     
+        ForEach(visibleMessages) { message in
+            MessageView(appState: appState,
+                        message: message,
+                        isTTSEnabled: appState.modelConfig?.tts.isEnabled ?? false)
+            .id(message.id)
+        }
+        
+        progressIndicator
+        
+        // invisible anchor for scrolling
+        Color.clear.frame(height: 1).id("scrollBottom")
     }
     
     var body: some View {
@@ -110,8 +121,14 @@ struct ChatLogView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            scrollContent
+                        if showAllMessages {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                scrollContent
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 0) {
+                                scrollContent
+                            }
                         }
                     }
                     .focusable()
@@ -136,28 +153,24 @@ struct ChatLogView: View {
                         
                         return .ignored
                     }
-
                 }
             }
             .onChange(of: appState.currentConversationID) { _, _ in
                 showAllMessages = false
-            }
-            .onChange(of: messages.count) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
-            .onAppear {
+            .onChange(of: appState.messageLog.count) { _, _ in
+                scrollToBottom(proxy: proxy)
+            }
+            .onAppear() {
                 scrollToBottom(proxy: proxy)
             }
         }
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        scrollTask?.cancel()
-        scrollTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms
-            if Task.isCancelled { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
             proxy.scrollTo("scrollBottom", anchor: .bottom)
-            self.scrollTask = nil
         }
     }
 }

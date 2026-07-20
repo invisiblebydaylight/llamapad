@@ -308,10 +308,20 @@ struct MessageView: View {
                 .cornerRadius(8)
                 .padding(4)
             } else {
-                MarkdownView(message.parsedContent.responseContent)
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
+                let isStreaming = appState.isGenerating
+                    && message.id == appState.messageLog.last?.id
+                    && message.sender == .ai
+                if isStreaming {
+                    Text(message.parsedContent.responseContent)
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    MarkdownView(message.parsedContent.responseContent)
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
+                }
             }
         }
         .background(message.sender == .user ?

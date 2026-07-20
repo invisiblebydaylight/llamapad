@@ -113,7 +113,7 @@ struct InputBarView: View {
                 filename: filename,
                 imageData: imageData,
                 mimeType: mimeType,
-                tokenEstimate: 768
+                tokenEstimate: Attachment.estimateImageTokens(imageData: imageData)
             )
             draftAttachments.append(attachment)
             return .handled
@@ -268,7 +268,7 @@ struct InputBarView: View {
                     
                     if let mimeType = detectImageMimeType(for: url) {
                         // it's an image — route to image attachment
-                        let estimate = 768
+                        let estimate = Attachment.estimateImageTokens(imageData: data)
                         let attachment = Attachment(filename: url.lastPathComponent, imageData: data, mimeType: mimeType, tokenEstimate: estimate)
                         tryAppend(attachment, estimate: estimate)
                     } else if let text = String(data: data, encoding: .utf8) {
@@ -340,7 +340,7 @@ struct InputBarView: View {
                             filename: filename,
                             imageData: imageData,
                             mimeType: "image/png",
-                            tokenEstimate: 768
+                            tokenEstimate: Attachment.estimateImageTokens(imageData: imageData)
                         )
                         draftAttachments.append(attachment)
                     } catch { continue }
