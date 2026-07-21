@@ -26,7 +26,7 @@ class VoiceContext: ObservableObject {
     @Published var isPlaying = false
     @Published var isReady = false
     @Published var lastError: String?
-    @Published var interruptRequested  = false
+    nonisolated(unsafe) var interruptRequested  = false
 
     /// this tracks the currently played message, if the data is provided
     @Published var speakingMessageID: UUID?
@@ -196,12 +196,15 @@ class VoiceContext: ObservableObject {
         
         // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
         interruptRequested = false
-        for (i, paragraph) in paragraphs.enumerated() {
-            if interruptRequested { break }
-
-            // too heavy of a compute for the main actor...
-            let audio = try await Task.detached(priority: .utility) {
-                let result = try await tts.generate(
+        
+        let (stream, continuation) = AsyncStream.makeStream(of: [Float].self)
+        
+        // Producer: generates audio as fast as possible
+        let producerTask = Task.detached(priority: .utility) {
+            for paragraph in paragraphs {
+                if Task.isCancelled || self.interruptRequested { break }
+                
+                let audio = try await tts.generate(
                     text: paragraph,
                     voice: !config.voice.isEmpty ? config.voice : nil,
                     refAudio: refAudio,
@@ -209,34 +212,25 @@ class VoiceContext: ObservableObject {
                     language: !config.language.isEmpty ? config.language : nil,
                 )
                 
-                // without clearing the cache, it would appear that memory stacks up
-                // until it will cause crashes on iOS.
                 MLX.Memory.clearCache()
                 
-                return result
-            }.value
-
-            // wait for the playback to finish before starting the next paragraph
-            // but only if it's not the first time through the loop
-            if i > 0 {
-                while isPlaying && !interruptRequested {
-                    try await Task.sleep(nanoseconds: 100_000_000)
-                }
+                continuation.yield(Array(audio.asArray(Float.self)))
             }
-            
-            if interruptRequested { break }
-
-            speakingMessageID = messageId
-
-            // hack to convert back to float array
-            let floatArray: [Float] = audio.asArray(Float.self)
-            try playBuffer(floatArray)
+            continuation.finish()
         }
         
-        // final delay to wait until the last message is finished playing
-        while isPlaying && !interruptRequested {
-            try await Task.sleep(nanoseconds: 100_000_000)
+        // Consumer: plays audio in order, waiting for each to finish
+        for try await audio in stream {
+            if interruptRequested { break }
+            try playBuffer(audio)
+            
+            // wait for playback to complete
+            while isPlaying && !interruptRequested {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
         }
+        
+        try? await producerTask.value
     }
     
     private func playBuffer(_ audio: [Float]) throws {
