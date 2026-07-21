@@ -26,7 +26,7 @@ class VoiceContext: ObservableObject {
     @Published var isPlaying = false
     @Published var isReady = false
     @Published var lastError: String?
-    nonisolated(unsafe) var interruptRequested  = false
+    private var producerTask: Task<Void, Never>?
 
     /// this tracks the currently played message, if the data is provided
     @Published var speakingMessageID: UUID?
@@ -74,7 +74,7 @@ class VoiceContext: ObservableObject {
         
         isReady = false
         isLoadingModel = true
-        interruptRequested = false
+        producerTask = nil
         defer {
             isLoadingModel = false
         }
@@ -195,42 +195,47 @@ class VoiceContext: ObservableObject {
         }
         
         // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
-        interruptRequested = false
-        
         let (stream, continuation) = AsyncStream.makeStream(of: [Float].self)
         
         // Producer: generates audio as fast as possible
-        let producerTask = Task.detached(priority: .utility) {
-            for paragraph in paragraphs {
-                if Task.isCancelled || self.interruptRequested { break }
-                
-                let audio = try await tts.generate(
-                    text: paragraph,
-                    voice: !config.voice.isEmpty ? config.voice : nil,
-                    refAudio: refAudio,
-                    refText: refAudioText,
-                    language: !config.language.isEmpty ? config.language : nil,
-                )
-                
-                MLX.Memory.clearCache()
-                
-                continuation.yield(Array(audio.asArray(Float.self)))
+        producerTask = Task.detached(priority: .utility) {
+            do {
+                for paragraph in paragraphs {
+                    if Task.isCancelled { break }
+                    
+                    let audio = try await tts.generate(
+                        text: paragraph,
+                        voice: !config.voice.isEmpty ? config.voice : nil,
+                        refAudio: refAudio,
+                        refText: refAudioText,
+                        language: !config.language.isEmpty ? config.language : nil,
+                    )
+                    
+                    MLX.Memory.clearCache()
+                    
+                    continuation.yield(Array(audio.asArray(Float.self)))
+                }
+            } catch {
+                continuation.finish()
+                return
             }
             continuation.finish()
         }
         
         // Consumer: plays audio in order, waiting for each to finish
         for try await audio in stream {
-            if interruptRequested { break }
+            if Task.isCancelled { break }
             try playBuffer(audio)
             
             // wait for playback to complete
-            while isPlaying && !interruptRequested {
+            while isPlaying && !Task.isCancelled {
                 try await Task.sleep(nanoseconds: 50_000_000)
             }
         }
         
-        try? await producerTask.value
+        if let task = producerTask {
+            await task.value
+        }
     }
     
     private func playBuffer(_ audio: [Float]) throws {
@@ -279,7 +284,7 @@ class VoiceContext: ObservableObject {
     func stopPlaying() {
         playerNode.stop()
         audioEngine.stop()
-        interruptRequested = true
+        producerTask?.cancel()
         isPlaying = false
         speakingMessageID = nil
     }
@@ -289,7 +294,7 @@ class VoiceContext: ObservableObject {
         tts = nil
         isReady = false
         isPlaying = false
-        interruptRequested = true
+        producerTask = nil
         speakingMessageID = nil
         
         // release the sandbox hold on the files
