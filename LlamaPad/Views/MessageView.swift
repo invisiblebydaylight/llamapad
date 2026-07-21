@@ -207,7 +207,7 @@ struct MessageView: View {
                                 // if audio is already playing, then the button press stops it.
                                 // if audio was not playing, then the app attempts to 'speak' the message content,
                                 // and arms the button.
-                                if voiceContext.isPlaying {
+                                if voiceContext.isPlaying || armedButton == .Speak {
                                     voiceContext.stopPlaying()
                                     armedButton = .None
                                 } else {

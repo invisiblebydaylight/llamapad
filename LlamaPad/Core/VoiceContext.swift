@@ -224,11 +224,11 @@ class VoiceContext: ObservableObject {
         
         // Consumer: plays audio in order, waiting for each to finish
         for try await audio in stream {
-            if Task.isCancelled { break }
+            if producerTask?.isCancelled ?? false || speakingMessageID != messageId { break }
             try playBuffer(audio)
             
             // wait for playback to complete
-            while isPlaying && !Task.isCancelled {
+            while isPlaying && !(producerTask?.isCancelled ?? false) && speakingMessageID == messageId {
                 try await Task.sleep(nanoseconds: 50_000_000)
             }
         }
