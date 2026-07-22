@@ -476,7 +476,7 @@ struct ModelConfigTab: View {
                         Text("Magic Seed")
                         TextField("", value: $draftConfig.customSampler.magic_seed, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.magic_seed)
+                        Stepper("", value: $draftConfig.customSampler.magic_seed, in:0...UInt32.max)
                             .labelsHidden()
                     }
                 }
