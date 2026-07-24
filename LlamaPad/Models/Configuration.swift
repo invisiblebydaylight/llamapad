@@ -35,11 +35,39 @@ struct TTSConfiguration: Codable {
     var autoPlayEnabled: Bool = false
     var voice: String = ""
     var language: String = "en"
+    var stripCodeBlocks: Bool = true
+    var stripMarkdown: Bool = true
+    var codeBlockSkipMessage: String = "Skipping a block of code..."
     var cfg: Float? = 0.5
     var emotion: Float? = 0.0
     var hfRepoId: String? = ""
     var voiceQuality: Quality? = .standard
     var voiceSpeed: Float? = 1.0
+    
+    init() {}
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        engine = try c.decodeIfPresent(TTSEngine.self, forKey: .engine) ?? .kokoro
+        isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        modelDirectory = try c.decodeIfPresent(String.self, forKey: .modelDirectory) ?? ""
+        modelBookmark = try c.decodeIfPresent(Data.self, forKey: .modelBookmark)
+        refAudioPath = try c.decodeIfPresent(String.self, forKey: .refAudioPath)
+        refAudioBookmark = try c.decodeIfPresent(Data.self, forKey: .refAudioBookmark)
+        refAudioText = try c.decodeIfPresent(String.self, forKey: .refAudioText) ?? ""
+        autoPlayEnabled = try c.decodeIfPresent(Bool.self, forKey: .autoPlayEnabled) ?? false
+        voice = try c.decodeIfPresent(String.self, forKey: .voice) ?? ""
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? "en"
+        stripCodeBlocks = try c.decodeIfPresent(Bool.self, forKey: .stripCodeBlocks) ?? true
+        stripMarkdown = try c.decodeIfPresent(Bool.self, forKey: .stripMarkdown) ?? true
+        codeBlockSkipMessage = try c.decodeIfPresent(String.self, forKey: .codeBlockSkipMessage) ?? "Skipping a block of code..."
+        cfg = try c.decodeIfPresent(Float.self, forKey: .cfg) ?? 0.5
+        emotion = try c.decodeIfPresent(Float.self, forKey: .emotion) ?? 0.0
+        hfRepoId = try c.decodeIfPresent(String.self, forKey: .hfRepoId) ?? "mlx-community/OmniVoice-bfloat16"
+        voiceQuality = try c.decodeIfPresent(Quality.self, forKey: .voiceQuality) ?? .standard
+        voiceSpeed = try c.decodeIfPresent(Float.self, forKey: .voiceSpeed) ?? 1.0
+    }
+
 }
 
 struct SamplerSettings : Codable, Equatable {

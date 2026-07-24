@@ -14,7 +14,8 @@ struct TTSConfigTab: View {
     
     @State private var showingFilePicker = false
     @State private var pickerTarget: TTSPickerTarget = .model
-    
+    @State private var isSpeechTextProcessingExpanded = false
+
     var body: some View {
         Form {
             Section("Text to Speech") {
@@ -126,10 +127,10 @@ struct TTSConfigTab: View {
                         .help(draftConfig.tts.engine != .qwen3 ?
                               "Language code (e.g., en, es, fr, ja, ko, zh)" : "Language (e.g. 'English')"
                         )
-                    .disabled(!draftConfig.tts.isEnabled)
-                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
-                
+                .disabled(!draftConfig.tts.isEnabled)
+                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+
                 if draftConfig.tts.engine == .qwen3 || draftConfig.tts.engine == .chatterbox  || draftConfig.tts.engine == .omnivoice {
                     VStack(spacing: 8) {
                         HStack {
@@ -250,6 +251,27 @@ struct TTSConfigTab: View {
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
+                
+                DisclosureGroup(isExpanded: $isSpeechTextProcessingExpanded) {
+                    Toggle("Skip code blocks", isOn: $draftConfig.tts.stripCodeBlocks)
+                    
+                    if draftConfig.tts.stripCodeBlocks {
+                        TextField("Skip message", text: $draftConfig.tts.codeBlockSkipMessage)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    Toggle("Strip markdown formatting", isOn: $draftConfig.tts.stripMarkdown)
+                }
+                label: {
+                   Text("Speech Text Processing")
+                       .onTapGesture {
+                           withAnimation {
+                               isSpeechTextProcessingExpanded.toggle()
+                           }
+                       }
+                }
+                .disabled(!draftConfig.tts.isEnabled)
+                .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
             }
         }
         .formStyle(.grouped)

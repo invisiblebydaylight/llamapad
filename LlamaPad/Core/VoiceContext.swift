@@ -171,8 +171,15 @@ class VoiceContext: ObservableObject {
         }
         
         // break the text string into 'paragraphs' by splitting at newlines and trimming
-        let paragraphs = text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).removingEmoji() }
+        var cleanedUp = text.removingEmoji()
+        if config.stripCodeBlocks {
+            cleanedUp = cleanedUp.removingCodeBlocks(replaceWith: config.codeBlockSkipMessage)
+        }
+        if config.stripMarkdown {
+            cleanedUp = cleanedUp.removingMarkdown()
+        }
+        let paragraphs = cleanedUp.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         
         
@@ -345,5 +352,20 @@ extension String {
         )
         .replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespaces)
+    }
+    
+    func removingCodeBlocks(replaceWith: String) -> String {
+        return self.replacingOccurrences(
+            of: #"```[\s\S]*?```"#,
+            with: replaceWith,
+            options: .regularExpression)
+    }
+    
+    func removingMarkdown() -> String {
+        return self
+            .replacingOccurrences(of: #"`([^`]+)`"#, with: "$1", options: .regularExpression) // backquote
+            .replacingOccurrences(of: #"\*+"#, with: "", options: .regularExpression)  // italic
+            .replacingOccurrences(of: #"(?m)^#+\s+"#, with: "", options: .regularExpression) // heading
+            .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression) // urls
     }
 }
