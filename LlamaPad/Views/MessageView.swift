@@ -203,6 +203,7 @@ struct MessageView: View {
                         Button(action: {
                             Task {
                                 guard appState.modelConfig != nil else { return }
+                                guard !voiceContext.isLoadingModel else { return }
                                 
                                 // if audio is already playing, then the button press stops it.
                                 // if audio was not playing, then the app attempts to 'speak' the message content,

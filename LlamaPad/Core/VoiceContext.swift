@@ -4,6 +4,7 @@ import AVFoundation
 import Combine
 import MLXAudioTTS
 import MLXAudioCore
+import MLXLMCommon
 
 enum VoiceError: LocalizedError {
     case noVoiceTensor
@@ -32,7 +33,7 @@ class VoiceContext: ObservableObject {
     @Published var speakingMessageID: UUID?
 
     /// this should be set to true while the models are loading
-    private var isLoadingModel = false
+    @Published var isLoadingModel = false
     
     private let audioEngine: AVAudioEngine!
     private let playerNode: AVAudioPlayerNode!
@@ -94,6 +95,12 @@ class VoiceContext: ObservableObject {
                 chatter.cfgWeightOverride = cfg
             }
             tts = chatter
+        case .omnivoice:
+            let repoID = config.hfRepoId
+            guard !(repoID?.isEmpty ?? true) else {
+                throw VoiceError.notReady
+            }
+            tts = try await OmniVoiceModel.fromPretrained(repoID ?? "mlx-community/OmniVoice-bfloat16")
         }
         
         isReady = true
@@ -147,6 +154,7 @@ class VoiceContext: ObservableObject {
         guard isReady, let tts = tts else {
             throw VoiceError.notReady
         }
+        
         
         // tag this particular messageId as the one we're speaking, if supplied with the UUID
         speakingMessageID = messageId
@@ -203,13 +211,36 @@ class VoiceContext: ObservableObject {
                 for paragraph in paragraphs {
                     if Task.isCancelled { break }
                     
-                    let audio = try await tts.generate(
-                        text: paragraph,
-                        voice: !config.voice.isEmpty ? config.voice : nil,
-                        refAudio: refAudio,
-                        refText: refAudioText,
-                        language: !config.language.isEmpty ? config.language : nil,
-                    )
+                    var audio: MLXArray
+                    if let omni = tts as? OmniVoiceModel {
+                        var ovParams = switch config.voiceQuality ?? .standard {
+                            case .fast:
+                                OmniVoiceGenerateParameters.fast
+                            case .standard:
+                                OmniVoiceGenerateParameters()
+                            case .high:
+                                OmniVoiceGenerateParameters.highQuality
+                        }
+                        
+                        ovParams.speed = config.voiceSpeed ?? 1.0
+                        
+                        audio = try await omni.generate(
+                            text: paragraph,
+                            voice: !config.voice.isEmpty ? config.voice : nil,
+                            refAudio: refAudio,
+                            refText: refAudioText,
+                            language: !config.language.isEmpty ? config.language : nil,
+                            ovParameters: ovParams
+                        )
+                    } else {
+                        audio = try await tts.generate(
+                            text: paragraph,
+                            voice: !config.voice.isEmpty ? config.voice : nil,
+                            refAudio: refAudio,
+                            refText: refAudioText,
+                            language: !config.language.isEmpty ? config.language : nil
+                        )
+                    }
                     
                     MLX.Memory.clearCache()
                     

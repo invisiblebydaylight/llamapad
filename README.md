@@ -35,6 +35,9 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ## Features
+* Added beta support for OmniVoice TTS voice designing and cloning. The library only lets you load this model
+  from HF cache, so it unfortunately must download from HF to the HF cache if it doesn't exist there already - it does
+  this in the background silently.
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native text generation.
 * Embedded [MLX](https://github.com/ml-explore/mlx-swift-lm) library for native Apple Silicon support.
 * OpenAI-compatible remote API backend for connecting to cloud services (e.g. OpenRouter) or self-hosted servers (e.g. llama.cpp server, llama-swap).
@@ -111,6 +114,16 @@ Qwen3 TTS Usage Guide:
 * When using plain TTS without direction (Base model), Voice Description, Reference Audio and Reference Text do not need to be set. It'll use a 'random' voice.
 * When using one of Qwen3-TTS's custom voices (CustomVoice model), set the Voice Description and reference one of the speaker names; do not set Reference Audio or Reference Text.
 * When using the voice designer (VoiceDesign model), set the Voice Description but do not set Reference Audio or Reference Text.
+
+#### OmniVoice
+Only the bfloat16 and possibly the original f32 versions ot his model from `mlx-community` will work because 
+they're the only complete conversions. Additionally, the library used for all of the AI audio features does not allow for this
+model to be loaded from file so the app is forced to consume it from the HuggingFace ecosystem. If the model id is not 
+already cached, then it will be downloaded on first use, which might take some time. 
+
+[Editor's note: There's currently no UI for this. If you like the way this works better or otherwise have an opinion,
+start a Discussion or raise an issue.] 
+
 
 ### Remote API Setup
 

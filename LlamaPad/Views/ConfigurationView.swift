@@ -102,7 +102,9 @@ struct ConfigurationView: View {
         Task {
             let isModelReloadNeeded = draftConfig.requiresReload(comparedTo: appState.modelConfig)
             let isVoiceReloadNeeded = appState.modelConfig == nil ||
-                (draftConfig.tts.modelDirectory != appState.modelConfig!.tts.modelDirectory)
+                draftConfig.tts.engine != appState.modelConfig!.tts.engine ||
+                draftConfig.tts.modelDirectory != appState.modelConfig!.tts.modelDirectory ||
+                draftConfig.tts.hfRepoId != appState.modelConfig!.tts.hfRepoId
             
             appState.modelConfig = AppConfiguration(draftConfig)
             do {

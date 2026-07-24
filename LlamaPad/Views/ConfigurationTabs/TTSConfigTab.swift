@@ -51,26 +51,40 @@ struct TTSConfigTab: View {
                 .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 
                 VStack {
-                    HStack {
-                        Text("TTS Model Folder")
-                        
-                        Spacer()
-                        
-                        if draftConfig.tts.modelDirectory.isEmpty {
-                            Text("TTS model folder required...")
-                                .foregroundColor(Color(.systemRed))
-                                .italic()
-                        } else {
-                            Text(URL(fileURLWithPath: draftConfig.tts.modelDirectory).lastPathComponent)
-                                .foregroundColor(.primary)
+                    if draftConfig.tts.engine != .omnivoice {
+                        HStack {
+                            Text("TTS Model Folder")
+                            
+                            Spacer()
+                            
+                            if draftConfig.tts.modelDirectory.isEmpty {
+                                Text("TTS model folder required...")
+                                    .foregroundColor(Color(.systemRed))
+                                    .italic()
+                            } else {
+                                Text(URL(fileURLWithPath: draftConfig.tts.modelDirectory).lastPathComponent)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Button("Browse...") {
+                                pickerTarget = .model
+                                showingFilePicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            .fixedSize()
+                            
                         }
-                        
-                        Button("Browse...") {
-                            pickerTarget = .model
-                            showingFilePicker = true
+                    } else {
+                        HStack {
+                            Text("HuggingFace Repo ID")
+                            Spacer()
+                            TextField("", text: Binding(
+                                get: {draftConfig.tts.hfRepoId ?? "mlx-community/OmniVoice-bfloat16" },
+                                set: {draftConfig.tts.hfRepoId = $0 }
+                            ))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(minWidth: 200, maxWidth: 300)
                         }
-                        .buttonStyle(.bordered)
-                        .fixedSize()
                     }
                 }
                 .disabled(!draftConfig.tts.isEnabled)
@@ -88,7 +102,7 @@ struct TTSConfigTab: View {
                     }
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
-                } else if draftConfig.tts.engine  == .qwen3 {
+                } else if draftConfig.tts.engine  == .qwen3 || draftConfig.tts.engine == .omnivoice {
                     HStack {
                         Text("Voice Description")
                         Spacer()
@@ -116,7 +130,7 @@ struct TTSConfigTab: View {
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
                 
-                if draftConfig.tts.engine == .qwen3 || draftConfig.tts.engine == .chatterbox {
+                if draftConfig.tts.engine == .qwen3 || draftConfig.tts.engine == .chatterbox  || draftConfig.tts.engine == .omnivoice {
                     VStack(spacing: 8) {
                         HStack {
                             Text("Reference Audio")
@@ -136,7 +150,7 @@ struct TTSConfigTab: View {
                             .buttonStyle(.bordered)
                         }
                         
-                        if draftConfig.tts.engine == .qwen3 {
+                        if draftConfig.tts.engine == .qwen3 || draftConfig.tts.engine == .omnivoice {
                             HStack {
                                 Text("Reference Text")
                                 Spacer()
@@ -197,7 +211,45 @@ struct TTSConfigTab: View {
                     .disabled(!draftConfig.tts.isEnabled)
                     .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
                 }
-
+                
+                if draftConfig.tts.engine == .omnivoice {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Quality")
+                            Spacer()
+                            Picker("", selection: Binding<Quality>(
+                                get: {draftConfig.tts.voiceQuality ?? .standard },
+                                set: {newValue in
+                                    DispatchQueue.main.async {
+                                        draftConfig.tts.voiceQuality = newValue
+                                    }
+                                }
+                            )) {
+                                ForEach(Quality.allCases, id: \.self) { q in
+                                    Text(q.rawValue).tag(q)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220)
+                        }
+                        HStack {
+                            Text("Speed")
+                            Spacer()
+                            Text(String(format: "%.1f×", draftConfig.tts.voiceSpeed ?? 1.0))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { draftConfig.tts.voiceSpeed ?? 1.0},
+                                set: { draftConfig.tts.voiceSpeed = $0 }
+                            ),
+                            in: 0.5...2.0, step: 0.1)
+                    }
+                    .disabled(!draftConfig.tts.isEnabled)
+                    .opacity(!draftConfig.tts.isEnabled ? 0.5 : 1.0)
+                }
             }
         }
         .formStyle(.grouped)

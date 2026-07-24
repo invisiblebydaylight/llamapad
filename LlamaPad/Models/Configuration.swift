@@ -9,12 +9,19 @@ enum TTSEngine: String, Codable, CaseIterable {
     case kokoro = "Kokoro"
     case qwen3 = "Qwen3-TTS"
     case chatterbox = "Chatterbox"
+    case omnivoice = "OmniVoice"
 }
 
 enum InferenceBackendType: String, Codable, CaseIterable {
     case llamaCPP = "llama.cpp"
     case mlx = "mlx"
     case remoteAPI = "api"
+}
+
+enum Quality: String, Codable, CaseIterable {
+    case fast = "Fast"
+    case standard = "Standard"
+    case high = "High"
 }
 
 struct TTSConfiguration: Codable {
@@ -30,6 +37,9 @@ struct TTSConfiguration: Codable {
     var language: String = "en"
     var cfg: Float? = 0.5
     var emotion: Float? = 0.0
+    var hfRepoId: String? = ""
+    var voiceQuality: Quality? = .standard
+    var voiceSpeed: Float? = 1.0
 }
 
 struct SamplerSettings : Codable, Equatable {
