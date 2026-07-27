@@ -484,4 +484,15 @@ struct MessageView: View {
     }
 }
 
+extension MessageView: Equatable {
+    static func == (lhs: MessageView, rhs: MessageView) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.content == rhs.message.content &&
+        lhs.isTTSEnabled == rhs.isTTSEnabled &&
+        lhs.isEditing == rhs.isEditing &&
+        lhs.armedButton == rhs.armedButton &&
+        lhs.showTray == rhs.showTray &&
+        lhs.isThinkingExpanded == rhs.isThinkingExpanded
+    }
+}
 

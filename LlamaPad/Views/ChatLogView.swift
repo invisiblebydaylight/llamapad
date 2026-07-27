@@ -2,21 +2,16 @@ import SwiftUI
 
 struct ChatLogView: View {
     @ObservedObject var appState: AppState
-    let messages: [Message]
 
     /// whether or not all messages should get rendered.
     @State private var showAllMessages: Bool = false
-
-    init (appState: AppState) {
-        self.appState = appState
-        messages = appState.messageLog
-    }
     
     private var lastMessageId: UUID? {
-        messages.last?.id
+        appState.messageLog.last?.id
     }
     
     private var visibleMessages: [Message] {
+        let messages = appState.messageLog
         if showAllMessages || self.appState.lastIncludedMessageIDs == nil {
             return messages
         }
@@ -59,6 +54,7 @@ struct ChatLogView: View {
 
     @ViewBuilder
     private var contextToggle: some View {
+        let messages = appState.messageLog
         let includedIDs = appState.lastIncludedMessageIDs
         
         if showAllMessages {
@@ -95,6 +91,7 @@ struct ChatLogView: View {
             MessageView(appState: appState,
                         message: message,
                         isTTSEnabled: appState.modelConfig?.tts.isEnabled ?? false)
+            .equatable()
             .id(message.id)
         }
         
@@ -121,14 +118,8 @@ struct ChatLogView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     ScrollView {
-                        if showAllMessages {
-                            LazyVStack(alignment: .leading, spacing: 0) {
-                                scrollContent
-                            }
-                        } else {
-                            VStack(alignment: .leading, spacing: 0) {
-                                scrollContent
-                            }
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            scrollContent
                         }
                     }
                     .focusable()
