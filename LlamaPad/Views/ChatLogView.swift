@@ -1,10 +1,120 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+
+/// This helper class is used to detect scrolling changes with the scroll wheel, allowing the ChatLogView to react  to those changes.
+/// Other ways of using geometry tricks couldn't reliably work on macOS.
+private struct ScrollWheelMonitor: NSViewRepresentable {
+    let onScroll: () -> Void
+    let onScrollDown: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScroll: onScroll, onScrollDown: onScrollDown)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.monitoredView = view
+        context.coordinator.installMonitor()
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        context.coordinator.onScroll = onScroll
+        context.coordinator.onScrollDown = onScrollDown
+        context.coordinator.monitoredView = view
+    }
+
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        coordinator.removeMonitor()
+    }
+
+    final class Coordinator {
+        var onScroll: () -> Void
+        var onScrollDown: () -> Void
+        weak var monitoredView: NSView?
+        private var eventMonitor: Any?
+
+        init(onScroll: @escaping () -> Void, onScrollDown: @escaping () -> Void) {
+            self.onScroll = onScroll
+            self.onScrollDown = onScrollDown
+        }
+
+        func installMonitor() {
+            guard eventMonitor == nil else { return }
+
+            eventMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.scrollWheel, .leftMouseDown, .leftMouseDragged]
+            ) { [weak self] event in
+                guard let self,
+                      let view = monitoredView,
+                      let window = view.window,
+                      event.window === window else {
+                    return event
+                }
+
+                let locationInWindow = event.locationInWindow
+                if event.type ==  .scrollWheel {
+                    let location = view.convert(locationInWindow, from: nil)
+                    if view.bounds.contains(location) {
+                        if event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0 {
+                            onScroll()
+                        }
+                        
+                        if event.scrollingDeltaY < 0 {
+                            onScrollDown()
+                        }
+                    }
+                } else if event.type == .leftMouseDown || event.type == .leftMouseDragged {
+                    if let contentView = window.contentView {
+                        let hitView = contentView.hitTest(locationInWindow)
+                        if hitView is NSScroller {
+                            onScroll()
+                        }
+                    }
+                }
+                    
+                
+                return event
+            }
+        }
+
+        func removeMonitor() {
+            if let eventMonitor {
+                NSEvent.removeMonitor(eventMonitor)
+                self.eventMonitor = nil
+            }
+        }
+        
+        deinit {
+            removeMonitor()
+        }
+    }
+}
+#endif
+
+private struct StreamingMessageObserver: View {
+    @ObservedObject var message: Message
+    let onContentChange: () -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: message.content) { _, _ in
+                onContentChange()
+            }
+    }
+}
+
 struct ChatLogView: View {
     @ObservedObject var appState: AppState
 
     /// whether or not all messages should get rendered.
     @State private var showAllMessages: Bool = false
+    
+    @State private var isAutoScrollEnabled = true
+    @State private var pendingAutoScroll: Task<Void, Never>?
     
     private var lastMessageId: UUID? {
         appState.messageLog.last?.id
@@ -144,11 +254,40 @@ struct ChatLogView: View {
                         
                         return .ignored
                     }
+                    .background {
+                        if let lastMessage = appState.messageLog.last {
+                            StreamingMessageObserver(message: lastMessage) {
+                                scheduleAutoScroll(proxy: proxy)
+                            }
+                        }
+                        #if os(macOS)
+                        ScrollWheelMonitor {
+                            disableAutoScroll()
+                        } onScrollDown: {
+                            if !isAutoScrollEnabled {
+                                isAutoScrollEnabled = true
+                                scheduleAutoScroll(proxy: proxy)
+                            }
+                        }
+                        #endif
+                    }
+                    #if os(iOS)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { _ in disableAutoScroll() }
+                    )
+                    #endif
                 }
             }
             .onChange(of: appState.currentConversationID) { _, _ in
                 showAllMessages = false
                 scrollToBottom(proxy: proxy)
+            }
+            .onChange(of: appState.isGenerating) { _, generating in
+                if generating {
+                    isAutoScrollEnabled = true
+                    scheduleAutoScroll(proxy: proxy)
+                }
             }
             .onChange(of: appState.messageLog.count) { _, _ in
                 scrollToBottom(proxy: proxy)
@@ -157,6 +296,26 @@ struct ChatLogView: View {
                 scrollToBottom(proxy: proxy)
             }
         }
+    }
+    
+    private func scheduleAutoScroll(proxy: ScrollViewProxy) {
+        guard isAutoScrollEnabled, pendingAutoScroll == nil else { return }
+
+        pendingAutoScroll = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(40))
+
+            if !Task.isCancelled && isAutoScrollEnabled {
+                proxy.scrollTo("scrollBottom", anchor: .bottom)
+            }
+
+            pendingAutoScroll = nil
+        }
+    }
+    
+    private func disableAutoScroll() {
+        isAutoScrollEnabled = false
+        pendingAutoScroll?.cancel()
+        pendingAutoScroll = nil
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {

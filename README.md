@@ -50,6 +50,10 @@ finishes generating it will attempt to speak it out loud using TTS.
 * File and image attachements: attach text files and images to user messages via the attachment button, copy/paste or drag and drop. Text file contents are injected into the message for all backendds; currently only the remote API backend attaches images and sends them as base64-encoded content.
 
 ### Recent changes (newer to older):
+* Smart auto-scrolling during response generation: the chatlog automatically follows incoming text,
+  but disengages the moment the user scrolls up. Scrolling back down re-engages it (though that behavior might
+  change in the future, depending on feedback).
+* Added support for OmniVoice TTS, though it is download-only via internal HF libraries for now, depending on upstream library.
 * Drag and drop support: drag text or image files onto the input bar at the bottom of the app to attach them.
 * Paste image support: copy an image to the clipboard and then hit `cmd-v` in the input field to attach it as an image attachment.
 * File attachements: attach text and image files to user messages; contents are injected into the prompt at the start of the message. Large file warnings prevent accidental context window exhaustion. Images are added as base64 encodes and are only currently supported by the remote API backend.
