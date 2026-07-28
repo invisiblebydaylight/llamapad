@@ -236,6 +236,7 @@ struct ChatLogView: View {
                     .focusEffectDisabled()
                     .onKeyPress(phases: .down) { press in
                         if press.key == .upArrow && press.modifiers.contains(.command) {
+                            disableAutoScroll()
                             DispatchQueue.main.async {
                                 if let firstId = visibleMessages.first?.id {
                                     proxy.scrollTo(firstId, anchor: .top)
@@ -246,6 +247,7 @@ struct ChatLogView: View {
                         if press.key == .downArrow && press.modifiers.contains(.command) {
                             DispatchQueue.main.async {
                                 if let lastId = visibleMessages.last?.id {
+                                    isAutoScrollEnabled = true
                                     proxy.scrollTo(lastId, anchor: .bottom)
                                 }
                             }
