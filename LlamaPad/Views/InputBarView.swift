@@ -85,6 +85,7 @@ struct InputBarView: View {
     }
 
     private func handleImagePaste() -> KeyPress.Result {
+        #if os(macOS)
         let pb = NSPasteboard.general
         
         let imageTypes: [(NSPasteboard.PasteboardType, String, String)] = [
@@ -120,6 +121,23 @@ struct InputBarView: View {
         }
         
         return .ignored
+        #else // not macOS
+        guard let image = UIPasteboard.general.image,
+              let pngData = image.pngData() else { return .ignored }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyMMddHHmmss"
+        let filename = "Paste-\(formatter.string(from: Date())).png"
+        
+        let attachment = Attachment(
+            filename: filename,
+            imageData: pngData,
+            mimeType: "image/png",
+            tokenEstimate: Attachment.estimateImageTokens(imageData: pngData)
+        )
+        draftAttachments.append(attachment)
+        return .handled
+        #endif
     }
 
     
@@ -307,6 +325,23 @@ struct InputBarView: View {
         }
     }
 
+    private func normalizeToPNG(_ data: Data) -> Data {
+        #if os(macOS)
+        if let nsImage = NSImage(data: data),
+           let tiffRep = nsImage.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiffRep),
+           let pngData = bitmap.representation(using: .png, properties: [:]) {
+            return pngData
+        }
+        #else
+        if let image = UIImage(data: data),
+           let pngData = image.pngData() {
+            return pngData
+        }
+        #endif
+        return data
+    }
+
     private func handleDrop(_ providers: [NSItemProvider]) {
         Task { @MainActor in
             for provider in providers {
@@ -322,15 +357,7 @@ struct InputBarView: View {
                     // raw image data — load and create attachment
                     do {
                         let data = try await loadData(from: provider, typeId: UTType.image.identifier)
-                        var imageData = data
-                        
-                        // convert TIFF to PNG if needed
-                        if let nsImage = NSImage(data: data),
-                           let tiffRep = nsImage.tiffRepresentation,
-                           let bitmap = NSBitmapImageRep(data: tiffRep),
-                           let pngData = bitmap.representation(using: .png, properties: [:]) {
-                            imageData = pngData
-                        }
+                        let imageData = normalizeToPNG(data)
                         
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyMMddHHmmss"
