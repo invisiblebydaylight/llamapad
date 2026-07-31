@@ -225,9 +225,6 @@ actor LlamaContext: Sendable {
                 var model_params = llama_model_default_params()
                 model_params.n_gpu_layers = offloadCount
                 
-                model_params.use_mmap = true
-                model_params.use_mlock = false
-                
 #if targetEnvironment(simulator)
                 // simulators don't support Metal
                 model_params.n_gpu_layers = 0

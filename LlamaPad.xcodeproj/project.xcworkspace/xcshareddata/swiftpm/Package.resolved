@@ -52,7 +52,7 @@
       "location" : "https://github.com/Blaizzy/mlx-audio-swift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "6ea59e549294151256b98b1cdbb346ba946d12d0"
+        "revision" : "4266f988d170a83017d1e82e2e4654602f277f1d"
       }
     },
     {
@@ -69,7 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ml-explore/mlx-swift-lm",
       "state" : {
-        "revision" : "343cae3799054b2e138ebfb1ae8d7d0f6c6a4a5b"
+        "branch" : "main",
+        "revision" : "a2736d4ea9472af8809a0b278c294aaf1f0918ba"
       }
     },
     {
@@ -149,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-jinja.git",
       "state" : {
-        "revision" : "9cde95abb5a01c6428137a5f9b50a2b994b53c25",
-        "version" : "2.4.1"
+        "revision" : "7d0b8880ef8e567dd4e0089f8b99fb354129017c",
+        "version" : "2.4.2"
       }
     },
     {
@@ -194,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "b5544ba79a70a0cb3563e75bf26dc198d6b40ed3",
-        "version" : "1.7.4"
+        "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
+        "version" : "1.7.5"
       }
     },
     {

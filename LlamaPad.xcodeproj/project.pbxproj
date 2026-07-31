@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C1F3FEE301C46E20011F688 /* llama.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1F3FED301C46E20011F688 /* llama.framework */; };
+		1C1F3FEF301C46E20011F688 /* llama.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1F3FED301C46E20011F688 /* llama.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F8F2EFC54A5004893BF /* Metal.framework */; };
 		1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C271F942EFC54AE004893BF /* Accelerate.framework */; };
 		1C36EB132F0DB92700E0F1A6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C36EB122F0DB92700E0F1A6 /* AppIcon.icon */; };
-		1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; };
-		1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1C437B652EB1B058000E4236 /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1C437B6E2EB1B12A000E4236 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 1C437B6D2EB1B12A000E4236 /* README.md */; };
 		1C5D6BD52FA4EEBA00B27F77 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BD42FA4EEBA00B27F77 /* MLXAudioCore */; };
 		1C5D6BD72FA4EEBA00B27F77 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5D6BD62FA4EEBA00B27F77 /* MLXAudioTTS */; };
@@ -25,13 +25,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		1C437B682EB1B058000E4236 /* Embed Frameworks */ = {
+		1C1F3FF0301C46E20011F688 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				1C437B672EB1B058000E4236 /* llama.xcframework in Embed Frameworks */,
+				1C1F3FEF301C46E20011F688 /* llama.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -39,6 +39,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1C1F3FED301C46E20011F688 /* llama.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = llama.framework; path = "llama.cpp/build-macos/framework/llama.framework"; sourceTree = "<group>"; };
 		1C271F8F2EFC54A5004893BF /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/Metal.framework; sourceTree = DEVELOPER_DIR; };
 		1C271F942EFC54AE004893BF /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/Accelerate.framework; sourceTree = DEVELOPER_DIR; };
 		1C36EB122F0DB92700E0F1A6 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -81,9 +82,9 @@
 				1C5D6BD72FA4EEBA00B27F77 /* MLXAudioTTS in Frameworks */,
 				1C8A558A2FA6ADE0000BA27C /* Tokenizers in Frameworks */,
 				1C271F922EFC54A5004893BF /* Metal.framework in Frameworks */,
+				1C1F3FEE301C46E20011F688 /* llama.framework in Frameworks */,
 				1C5D6BD52FA4EEBA00B27F77 /* MLXAudioCore in Frameworks */,
 				1C8A55872FA6AD8E000BA27C /* Jinja in Frameworks */,
-				1C437B662EB1B058000E4236 /* llama.xcframework in Frameworks */,
 				1C72F3042F3125BF0009D925 /* MarkdownView in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,6 +95,7 @@
 		1C437B642EB1B058000E4236 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				1C1F3FED301C46E20011F688 /* llama.framework */,
 				1C271F942EFC54AE004893BF /* Accelerate.framework */,
 				1C271F8F2EFC54A5004893BF /* Metal.framework */,
 				1C437B652EB1B058000E4236 /* llama.xcframework */,
@@ -131,7 +133,7 @@
 				1C818A8F2EAEBB8400D864C9 /* Sources */,
 				1C818A902EAEBB8400D864C9 /* Frameworks */,
 				1C818A912EAEBB8400D864C9 /* Resources */,
-				1C437B682EB1B058000E4236 /* Embed Frameworks */,
+				1C1F3FF0301C46E20011F688 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -367,6 +369,10 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/llama.cpp/build-macos/framework",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LlamaPad/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = LlamaPad;
@@ -434,6 +440,10 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/llama.cpp/build-macos/framework",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LlamaPad/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = LlamaPad;
@@ -519,8 +529,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
 			requirement = {
-				kind = revision;
-				revision = 343cae3799054b2e138ebfb1ae8d7d0f6c6a4a5b;
+				branch = main;
+				kind = branch;
 			};
 		};
 		1C8A55852FA6AD8E000BA27C /* XCRemoteSwiftPackageReference "swift-jinja" */ = {
