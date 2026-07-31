@@ -266,7 +266,7 @@ struct ChatLogView: View {
                         ScrollWheelMonitor {
                             disableAutoScroll()
                         } onScrollDown: {
-                            if !isAutoScrollEnabled {
+                            if !isAutoScrollEnabled && appState.isGenerating {
                                 isAutoScrollEnabled = true
                                 scheduleAutoScroll(proxy: proxy)
                             }
