@@ -40,6 +40,9 @@ class MLXBackend: InferenceBackend {
     /// this is the cached ChatSessiont that can be reused if SessionSignature checks out
     private var chatSession: ChatSession? = nil
     
+    /// keeps track of the task used for generation so that it can be cancelled if needed.
+    private var generationTask: Task<Void, Never>?
+    
     /// this is used to test against the current messages the client wishes to send to the
     /// backend to see if a new ChatSession needs to get created because messages changed.
     private var chatSessionSignature: SessionSignature? = nil
@@ -135,6 +138,11 @@ class MLXBackend: InferenceBackend {
             return tokens.count
         }
         return tokenCount
+    }
+    
+    func cancel() async {
+        generationTask?.cancel()
+        generationTask = nil
     }
     
     func generate(messages: [Message],
@@ -308,9 +316,14 @@ class MLXBackend: InferenceBackend {
                     
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: InferenceError.generationFailed(error.localizedDescription))
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: InferenceError.generationFailed(error.localizedDescription))
+                    }
                 }
             }
+            self.generationTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }

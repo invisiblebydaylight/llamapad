@@ -16,6 +16,9 @@ class LlamaBackend : InferenceBackend {
     /// track security access for it.
     private var currentModelURLs: [URL] = []
     
+    /// keeps track of the task used for generation so that it can be cancelled if needed.
+    private var generationTask: Task<Void, Never>?
+    
     /// tracks the first message to be included in the prompt allowing some maintenance
     /// of KV cache stability so that constant prompt ingestion doesn't have to happen.
     private var contextAnchorID: UUID?
@@ -133,6 +136,11 @@ class LlamaBackend : InferenceBackend {
         return tokens
     }
     
+    func cancel() async {
+        generationTask?.cancel()
+        generationTask = nil
+    }
+    
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
@@ -202,9 +210,14 @@ class LlamaBackend : InferenceBackend {
 
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: error)
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
                 }
             }
+            self.generationTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }

@@ -9,6 +9,8 @@ class RemoteAPIBackend: InferenceBackend {
 
     private var contextAnchorID: UUID? = nil
 
+    /// keep track of the task used for generation to better cancel it.
+    private var generationTask: Task<Void, Never>?
     
     var isLoaded: Bool {
         return loadedConfig != nil
@@ -41,6 +43,11 @@ class RemoteAPIBackend: InferenceBackend {
     func countTokens(for text: String) async -> Int {
         let charsPerTokenEstimate = 4
         return text.count / charsPerTokenEstimate
+    }
+    
+    func cancel() async {
+        generationTask?.cancel()
+        generationTask = nil
     }
     
     func generate(
@@ -324,6 +331,7 @@ class RemoteAPIBackend: InferenceBackend {
                     ))
                 }
             }
+            self.generationTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }

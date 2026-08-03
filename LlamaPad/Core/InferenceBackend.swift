@@ -53,6 +53,8 @@ protocol InferenceBackend: AnyObject {
         isContinuation: Bool,
         settings: GenerationSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error>
+    
+    func cancel() async
 }
 
 struct GenerationChunk: Sendable {

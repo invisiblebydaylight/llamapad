@@ -205,6 +205,9 @@ struct InputBarView: View {
                     case .StopGeneration:
                         // if we're genererating already, the button stops the current generation
                         appState.shouldStopGenerating = true
+                        Task {
+                            await appState.backend?.cancel()
+                        }
                     case .SendUserMessage:
                         // we do that by calling the action passed from the parent.
                         let attachments = draftAttachments

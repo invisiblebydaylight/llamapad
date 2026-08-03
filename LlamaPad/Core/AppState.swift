@@ -320,6 +320,7 @@ class AppState: ObservableObject {
                 // point at which we bail out of the prediction stream. upstream (hah!)
                 // code has to catch the termination and cancel the task to truly stop it.
                 if shouldStopGenerating {
+                    await backend.cancel()
                     break;
                 }
                 
@@ -349,7 +350,11 @@ class AppState: ObservableObject {
                 }
             }
         } catch {
-            reportError("Error generating response: \(error.localizedDescription)")
+            if shouldStopGenerating {
+                // ignore errors for this case
+            } else {
+                reportError("Error generating response: \(error.localizedDescription)")
+            }
             return
         }
 
