@@ -86,41 +86,25 @@ struct InputBarView: View {
 
     private func handleImagePaste() -> KeyPress.Result {
         #if os(macOS)
-        let pb = NSPasteboard.general
-        
-        let imageTypes: [(NSPasteboard.PasteboardType, String, String)] = [
-            (.png, "image/png", "png"),
-            (.tiff, "image/png", "png")
-        ]
-        
-        for (pbType, mimeType, ext) in imageTypes {
-            guard let data = pb.data(forType: pbType) else { continue }
-            
-            var imageData = data
-            
-            if pbType == .tiff {
-                guard let nsImage = NSImage(data: data),
-                      let tiffRep = nsImage.tiffRepresentation,
-                      let bitmap = NSBitmapImageRep(data: tiffRep),
-                      let pngData = bitmap.representation(using: .png, properties: [:]) else { continue }
-                imageData = pngData
-            }
-            
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyMMddHHmmss"
-            let filename = "Paste-\(formatter.string(from: Date())).\(ext)"
-            
-            let attachment = Attachment(
-                filename: filename,
-                imageData: imageData,
-                mimeType: mimeType,
-                tokenEstimate: Attachment.estimateImageTokens(imageData: imageData)
-            )
-            draftAttachments.append(attachment)
-            return .handled
+        guard let nsImage = NSImage(pasteboard: .general),
+              let tiffRep = nsImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffRep),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            return .ignored
         }
+            
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyMMddHHmmss"
+        let filename = "Paste-\(formatter.string(from: Date())).png"
         
-        return .ignored
+        let attachment = Attachment(
+            filename: filename,
+            imageData: pngData,
+            mimeType: "image/png",
+            tokenEstimate: Attachment.estimateImageTokens(imageData: pngData)
+        )
+        draftAttachments.append(attachment)
+        return .handled
         #else // not macOS
         guard let image = UIPasteboard.general.image,
               let pngData = image.pngData() else { return .ignored }
@@ -174,12 +158,6 @@ struct InputBarView: View {
                             }
                             
                             return .handled
-                        }
-                        return .ignored
-                    }
-                    .onKeyPress (keys: [.init("v")]) { press in
-                        if press.modifiers.contains(.command) {
-                            return handleImagePaste()
                         }
                         return .ignored
                     }
@@ -255,6 +233,14 @@ struct InputBarView: View {
             handleDrop(providers)
             return true
         }
+        .background(
+            // Invisible button to capture the keyboard shortcut
+            Button("") {
+                _ = handleImagePaste()
+            }
+            .keyboardShortcut("v", modifiers: .command)
+            .opacity(0)
+        )
 
         // chip row of draft attachements
         if !draftAttachments.isEmpty {
