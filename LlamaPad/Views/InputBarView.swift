@@ -84,47 +84,6 @@ struct InputBarView: View {
         inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private func handleImagePaste() -> KeyPress.Result {
-        #if os(macOS)
-        guard let nsImage = NSImage(pasteboard: .general),
-              let tiffRep = nsImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffRep),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            return .ignored
-        }
-            
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyMMddHHmmss"
-        let filename = "Paste-\(formatter.string(from: Date())).png"
-        
-        let attachment = Attachment(
-            filename: filename,
-            imageData: pngData,
-            mimeType: "image/png",
-            tokenEstimate: Attachment.estimateImageTokens(imageData: pngData)
-        )
-        draftAttachments.append(attachment)
-        return .handled
-        #else // not macOS
-        guard let image = UIPasteboard.general.image,
-              let pngData = image.pngData() else { return .ignored }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyMMddHHmmss"
-        let filename = "Paste-\(formatter.string(from: Date())).png"
-        
-        let attachment = Attachment(
-            filename: filename,
-            imageData: pngData,
-            mimeType: "image/png",
-            tokenEstimate: Attachment.estimateImageTokens(imageData: pngData)
-        )
-        draftAttachments.append(attachment)
-        return .handled
-        #endif
-    }
-
-    
     var body: some View {
         VStack {
             HStack {
@@ -233,14 +192,6 @@ struct InputBarView: View {
             handleDrop(providers)
             return true
         }
-        .background(
-            // Invisible button to capture the keyboard shortcut
-            Button("") {
-                _ = handleImagePaste()
-            }
-            .keyboardShortcut("v", modifiers: .command)
-            .opacity(0)
-        )
 
         // chip row of draft attachements
         if !draftAttachments.isEmpty {
