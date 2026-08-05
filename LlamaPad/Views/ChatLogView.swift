@@ -289,6 +289,8 @@ struct ChatLogView: View {
                 if generating {
                     isAutoScrollEnabled = true
                     scheduleAutoScroll(proxy: proxy)
+                } else {
+                    disableAutoScroll()
                 }
             }
             .onChange(of: appState.messageLog.count) { _, _ in
@@ -304,7 +306,7 @@ struct ChatLogView: View {
         guard isAutoScrollEnabled, pendingAutoScroll == nil else { return }
 
         pendingAutoScroll = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(40))
+            try? await Task.sleep(for: .milliseconds(8))
 
             if !Task.isCancelled && isAutoScrollEnabled {
                 proxy.scrollTo("scrollBottom", anchor: .bottom)
