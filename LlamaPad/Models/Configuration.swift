@@ -70,6 +70,20 @@ struct TTSConfiguration: Codable {
 
 }
 
+struct AppSettings: Codable {
+    var fontSize: Double = 14.0
+    var autoScrollDuringGeneration: Bool = true
+    
+    init() {
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 14.0
+        autoScrollDuringGeneration = try c.decodeIfPresent(Bool.self, forKey: .autoScrollDuringGeneration) ?? true
+    }
+}
+
 struct SamplerSettings : Codable, Equatable {
     var temperature: Float = 0.7
     var topK: Int32 = 40
@@ -168,9 +182,10 @@ class AppConfiguration: ObservableObject, Codable {
     @Published var kvCacheType: KVCacheType = .f16
     @Published var customSampler: SamplerSettings = SamplerSettings()
     @Published var tts: TTSConfiguration = TTSConfiguration()
+    @Published var appSettings: AppSettings = AppSettings()
 
     enum CodingKeys: String, CodingKey {
-        case backendType, modelPaths, modelBookmarks, activeProfileId, apiProfiles, apiEnabledSamplers, chatTemplate, enableThinking, apiReasoningEffort, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts
+        case backendType, modelPaths, modelBookmarks, activeProfileId, apiProfiles, apiEnabledSamplers, chatTemplate, enableThinking, apiReasoningEffort, contextLength, maxGenerationLength, reservedContextBuffer, contextRunway, layerCountToOffload, kvCacheType, customSampler, tts, appSettings
     }
     
     var isRemote: Bool { backendType == .remoteAPI }
@@ -235,6 +250,7 @@ class AppConfiguration: ObservableObject, Codable {
         kvCacheType = try container.decodeIfPresent(KVCacheType.self, forKey: .kvCacheType) ?? .f16
         customSampler = try container.decode(SamplerSettings.self, forKey: .customSampler)
         tts = try container.decode(TTSConfiguration.self, forKey: .tts)
+        appSettings = try container.decodeIfPresent(AppSettings.self, forKey: .appSettings) ?? AppSettings()
     }
     
     // deep copy initializer
@@ -256,6 +272,7 @@ class AppConfiguration: ObservableObject, Codable {
         self.kvCacheType = other.kvCacheType
         self.customSampler = other.customSampler
         self.tts = other.tts
+        self.appSettings = other.appSettings
     }
     
     func encode(to encoder: Encoder) throws {
@@ -277,6 +294,7 @@ class AppConfiguration: ObservableObject, Codable {
         try container.encode(kvCacheType, forKey: .kvCacheType)
         try container.encode(customSampler, forKey: .customSampler)
         try container.encode(tts, forKey: .tts)
+        try container.encode(appSettings, forKey: .appSettings)
     }
 }
 

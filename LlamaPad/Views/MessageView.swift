@@ -279,7 +279,7 @@ struct MessageView: View {
                 VStack(spacing: 0) {
                     TextEditor(text: $draftContent)
                         .focused($isEditorFocused)
-                        .font(.body)
+                        .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0))
                         .frame(minHeight: 40, maxHeight: 400)
                         .scrollContentBackground(.hidden)
                         .padding(8)
@@ -314,11 +314,13 @@ struct MessageView: View {
                     && message.sender == .ai
                 if isStreaming {
                     Text(message.parsedContent.responseContent)
+                        .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0))
                         .textSelection(.enabled)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     MarkdownView(message.parsedContent.responseContent)
+                        .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0), for: .body)
                         .textSelection(.enabled)
                         .padding(12)
                         .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)

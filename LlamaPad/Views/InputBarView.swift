@@ -88,6 +88,7 @@ struct InputBarView: View {
         VStack {
             HStack {
                 TextEditor(text: $inputText)
+                    .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0))
                     .padding(4)
                     .frame(minHeight: 40, maxHeight: 120)
                     .fixedSize(horizontal: false, vertical: true)

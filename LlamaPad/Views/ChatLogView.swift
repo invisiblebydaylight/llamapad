@@ -202,13 +202,17 @@ struct ChatLogView: View {
                         message: message,
                         isTTSEnabled: appState.modelConfig?.tts.isEnabled ?? false)
             .equatable()
-            .id(message.id)
+            
+            // we tie the id to the font here just so that the UI has to completely redraw
+            // if we change the font size.
+            .id("\(message.id)-\(appState.modelConfig?.appSettings.fontSize ?? 14.0)")
         }
         
         progressIndicator
         
         // invisible anchor for scrolling
         Color.clear.frame(height: 1).id("scrollBottom")
+        Color.clear.frame(height: 400)
     }
     
     var body: some View {
@@ -267,8 +271,11 @@ struct ChatLogView: View {
                             disableAutoScroll()
                         } onScrollDown: {
                             if !isAutoScrollEnabled && appState.isGenerating {
-                                isAutoScrollEnabled = true
-                                scheduleAutoScroll(proxy: proxy)
+                                let autoScrollSetting = appState.modelConfig?.appSettings.autoScrollDuringGeneration ?? true
+                                if autoScrollSetting {
+                                    isAutoScrollEnabled = true
+                                    scheduleAutoScroll(proxy: proxy)
+                                }
                             }
                         }
                         #endif
@@ -287,8 +294,10 @@ struct ChatLogView: View {
             }
             .onChange(of: appState.isGenerating) { _, generating in
                 if generating {
-                    isAutoScrollEnabled = true
-                    scheduleAutoScroll(proxy: proxy)
+                    isAutoScrollEnabled = appState.modelConfig?.appSettings.autoScrollDuringGeneration ?? true
+                    if isAutoScrollEnabled {
+                        scheduleAutoScroll(proxy: proxy)
+                    }
                 } else {
                     disableAutoScroll()
                 }

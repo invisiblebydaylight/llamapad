@@ -50,6 +50,8 @@ finishes generating it will attempt to speak it out loud using TTS.
 * File and image attachements: attach text files and images to user messages via the attachment button, copy/paste or drag and drop. Text file contents are injected into the message for all backendds; currently only the remote API backend attaches images and sends them as base64-encoded content.
 
 ### Recent changes (newer to older):
+* Application Settings as a new tab in the configuration window. Currently you can change the font size used for the
+  chatlog in the app and you can toggle auto-scroll behavior (enabled by default).
 * Smart auto-scrolling during response generation: the chatlog automatically follows incoming text,
   but disengages the moment the user scrolls up. Scrolling back down re-engages it (though that behavior might
   change in the future, depending on feedback).

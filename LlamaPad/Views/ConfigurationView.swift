@@ -53,6 +53,10 @@ struct ConfigurationView: View {
                 TTSConfigTab(appState: appState, draftConfig: draftConfig, showingError: $showingError, errorMessage: $errorMessage).tabItem {
                     Label("Voice", systemImage: "speaker.wave.3")
                 }
+                
+                InterfaceConfigTab(draftConfig: draftConfig).tabItem {
+                    Label("Interface", systemImage: "textformat")
+                }
             }
             .tabViewStyle(.automatic)
             .padding(.vertical, 8)
