@@ -116,6 +116,8 @@ struct ChatLogView: View {
     @State private var isAutoScrollEnabled = true
     @State private var pendingAutoScroll: Task<Void, Never>?
     
+    @FocusState private var isChatLogFocused: Bool
+    
     private var lastMessageId: UUID? {
         appState.messageLog.last?.id
     }
@@ -215,6 +217,12 @@ struct ChatLogView: View {
         Color.clear.frame(height: 400)
     }
     
+    #if os(macOS)
+    private var isTextEditorFocused: Bool {
+        NSApp.keyWindow?.firstResponder is NSTextView
+    }
+    #endif
+    
     var body: some View {
         ScrollViewReader { proxy in
             ZStack {
@@ -237,13 +245,21 @@ struct ChatLogView: View {
                         }
                     }
                     .focusable()
+                    .focused($isChatLogFocused)
                     .focusEffectDisabled()
                     .onKeyPress(phases: .down) { press in
+                        // if possible, don't handle these events this way when a text editor is focused,
+                        // which allows the text editor to intercept these key chords.
+                        #if os(macOS)
+                        if isTextEditorFocused { return .ignored }
+                        #endif
+
                         if press.key == .upArrow && press.modifiers.contains(.command) {
                             disableAutoScroll()
                             DispatchQueue.main.async {
                                 if let firstId = visibleMessages.first?.id {
                                     proxy.scrollTo(firstId, anchor: .top)
+                                    isChatLogFocused = true
                                 }
                             }
                             return .handled
@@ -253,6 +269,7 @@ struct ChatLogView: View {
                                 if let lastId = visibleMessages.last?.id {
                                     isAutoScrollEnabled = true
                                     proxy.scrollTo(lastId, anchor: .bottom)
+                                    isChatLogFocused = true
                                 }
                             }
                             return .handled
