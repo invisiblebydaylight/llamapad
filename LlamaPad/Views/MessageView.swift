@@ -261,6 +261,22 @@ struct MessageView: View {
             }
         }
     }
+
+    private var MarkdownContent: some View {
+        let baseSize = appState.modelConfig?.appSettings.fontSize ?? 14.0
+        return MarkdownView(message.parsedContent.responseContent)
+            .font(.system(size: baseSize), for: .body)
+            .font(.system(size: baseSize * 0.85, design: .monospaced), for: .codeBlock)
+            .font(.system(size: baseSize * 0.9), for: .blockQuote)
+            .font(.system(size: baseSize, design: .serif), for: .inlineMath)
+            .font(.system(size: baseSize, design: .serif), for: .displayMath)
+            .font(.system(size: baseSize * 0.85, weight: .semibold), for: .tableHeader)
+            .font(.system(size: baseSize * 0.85), for: .tableBody)
+            .markdownMathRenderingEnabled()
+            .textSelection(.enabled)
+            .padding(12)
+            .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
+    }
     
     private var MessageBubbleContent: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -309,14 +325,7 @@ struct MessageView: View {
                 .cornerRadius(8)
                 .padding(4)
             } else {
-                let isStreaming = appState.isGenerating
-                    && message.id == appState.messageLog.last?.id
-                    && message.sender == .ai
-                    MarkdownView(message.parsedContent.responseContent)
-                        .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0), for: .body)
-                        .textSelection(.enabled)
-                        .padding(12)
-                        .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
+                MarkdownContent
             }
         }
         .background(message.sender == .user ?
