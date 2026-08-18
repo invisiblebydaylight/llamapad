@@ -159,13 +159,13 @@ actor LlamaContext: Sendable {
         let n_ctx_train = llama_model_n_ctx_train(model)
         
         llama_sampler_chain_add(sampling, llama_sampler_init_penalties(
+            llama_vocab_n_tokens(vocab),
             settings.repeatLastN,
             settings.repeatPenalty,
             settings.freqPenalty,
             settings.presencePenalty))
         llama_sampler_chain_add(sampling, llama_sampler_init_dry(
             vocab,
-            n_ctx_train,
             settings.dryMultiplier,
             settings.dryBase,
             settings.dryAllowedLen,
