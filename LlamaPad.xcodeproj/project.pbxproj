@@ -22,6 +22,7 @@
 		1C8A558A2FA6ADE0000BA27C /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A55892FA6ADE0000BA27C /* Tokenizers */; };
 		1C8A558D2FA6AED7000BA27C /* MLXLMTransformers in Frameworks */ = {isa = PBXBuildFile; productRef = 1C8A558C2FA6AED7000BA27C /* MLXLMTransformers */; };
 		1C8FF5812EF0CF3000F7F4A2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 1C8FF5802EF0CF3000F7F4A2 /* LICENSE */; };
+		1CA8B8233034E905008DCCAF /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 1CA8B8223034E905008DCCAF /* MLXVLM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -77,6 +78,7 @@
 			files = (
 				1C8A55782FA6792B000BA27C /* MLXLMCommon in Frameworks */,
 				1C8A558D2FA6AED7000BA27C /* MLXLMTransformers in Frameworks */,
+				1CA8B8233034E905008DCCAF /* MLXVLM in Frameworks */,
 				1C8A55762FA6792B000BA27C /* MLXLLM in Frameworks */,
 				1C271F952EFC54AE004893BF /* Accelerate.framework in Frameworks */,
 				1C5D6BD72FA4EEBA00B27F77 /* MLXAudioTTS in Frameworks */,
@@ -152,6 +154,7 @@
 				1C8A55862FA6AD8E000BA27C /* Jinja */,
 				1C8A55892FA6ADE0000BA27C /* Tokenizers */,
 				1C8A558C2FA6AED7000BA27C /* MLXLMTransformers */,
+				1CA8B8223034E905008DCCAF /* MLXVLM */,
 			);
 			productName = LlamaPad;
 			productReference = 1C818A932EAEBB8400D864C9 /* LlamaPad.app */;
@@ -392,8 +395,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapad;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -460,8 +463,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.invisiblebydaylight.LlamaPad;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapadDemo;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapadDemo;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.invisiblebydaylight.llamapad;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.invisiblebydaylight.llamapad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -595,6 +598,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1C8A558B2FA6AED7000BA27C /* XCRemoteSwiftPackageReference "swift-transformers-mlx" */;
 			productName = MLXLMTransformers;
+		};
+		1CA8B8223034E905008DCCAF /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C8A55742FA6792B000BA27C /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXVLM;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
