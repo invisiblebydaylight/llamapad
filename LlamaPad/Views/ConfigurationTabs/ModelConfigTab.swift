@@ -224,7 +224,10 @@ struct ModelConfigTab: View {
                                     .help("The model name recognized by the server to use for text generation.")
                                     .onKeyPress(.tab) {
                                         if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
-                                            binding.modelName.wrappedValue = suggestion
+                                            let currentInput = binding.modelName.wrappedValue
+                                            DispatchQueue.main.async {
+                                                binding.modelName.wrappedValue = suggestion
+                                            }
                                         }
                                         return .handled
                                     }
@@ -493,7 +496,7 @@ struct ModelConfigTab: View {
                     Text("Context Runway")
                     TextField("", value: $draftConfig.contextRunway, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
+                    Stepper("", value: $draftConfig.contextRunway, in: 0...Int.max, step: 256)
                         .labelsHidden()
                 }
                 
