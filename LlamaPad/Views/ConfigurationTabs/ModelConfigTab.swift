@@ -224,7 +224,6 @@ struct ModelConfigTab: View {
                                     .help("The model name recognized by the server to use for text generation.")
                                     .onKeyPress(.tab) {
                                         if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
-                                            let currentInput = binding.modelName.wrappedValue
                                             DispatchQueue.main.async {
                                                 binding.modelName.wrappedValue = suggestion
                                             }
@@ -248,7 +247,7 @@ struct ModelConfigTab: View {
                         Text("Layers To Offload")
                         TextField("", value: $draftConfig.layerCountToOffload, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.layerCountToOffload, in: 0...200, step: 1)
+                        Stepper("", value: $draftConfig.layerCountToOffload, in: 0...1000, step: 1)
                             .labelsHidden()
                     }
                 }
@@ -257,7 +256,7 @@ struct ModelConfigTab: View {
                     Text("Context Length")
                     TextField("", value: $draftConfig.contextLength, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.contextLength, in: 4096...(64*1024), step: 1024)
+                    Stepper("", value: $draftConfig.contextLength, in: 4096...Int.max, step: 1024)
                         .labelsHidden()
                 }
                 
@@ -265,7 +264,7 @@ struct ModelConfigTab: View {
                     Text("Max Generation Length")
                     TextField("", value: $draftConfig.maxGenerationLength, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.maxGenerationLength, in: 0...(64*1024), step: 128)
+                    Stepper("", value: $draftConfig.maxGenerationLength, in: 0...Int.max, step: 128)
                         .labelsHidden()
                 }
                 
@@ -401,7 +400,7 @@ struct ModelConfigTab: View {
                             Text("Top-K")
                             TextField("", value: $draftConfig.customSampler.topK, format: .number)
                                 .multilineTextAlignment(.trailing)
-                            Stepper("", value: $draftConfig.customSampler.topK, in: 0...200)
+                            Stepper("", value: $draftConfig.customSampler.topK, in: 0...Int32.max)
                                 .labelsHidden()
                         }
                         HStack {
@@ -428,7 +427,7 @@ struct ModelConfigTab: View {
                         Text("Repetition Penalty Length")
                         TextField("", value: $draftConfig.customSampler.repeatLastN, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.repeatLastN, in: 64...4096, step: 64)
+                        Stepper("", value: $draftConfig.customSampler.repeatLastN, in: 0...Int32.max, step: 64)
                             .labelsHidden()
                     }
                     HStack {
@@ -487,7 +486,7 @@ struct ModelConfigTab: View {
                     Text("Reserved Context Buffer")
                     TextField("", value: $draftConfig.reservedContextBuffer, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.reservedContextBuffer, in: 128...4096, step: 128)
+                    Stepper("", value: $draftConfig.reservedContextBuffer, in: 0...Int.max, step: 256)
                         .labelsHidden()
                         .opacity(draftConfig.maxGenerationLength > 0 ? 0.5 : 1.0)
                         .disabled(draftConfig.maxGenerationLength > 0) // only is effective if no max generation length set

@@ -156,8 +156,6 @@ actor LlamaContext: Sendable {
         let sparams = llama_sampler_chain_default_params()
         sampling = llama_sampler_chain_init(sparams)
         
-        let n_ctx_train = llama_model_n_ctx_train(model)
-        
         llama_sampler_chain_add(sampling, llama_sampler_init_penalties(
             llama_vocab_n_tokens(vocab),
             settings.repeatLastN,
