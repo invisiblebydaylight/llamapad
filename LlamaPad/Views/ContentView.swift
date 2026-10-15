@@ -45,8 +45,9 @@ struct ContentView: View {
                 InputBarView(
                     appState: appState,
                     inputText: $inputText,
-                    onSendUserMessage: { message in
+                    onSendUserMessage: { message, attachments in
                         let newMessage = Message(sender: .user, content: message)
+                        newMessage.attachments  = attachments.isEmpty ? nil : attachments
                         appState.messageLog.append(newMessage)
                         Task {
                             await appState.generateChatResponse()

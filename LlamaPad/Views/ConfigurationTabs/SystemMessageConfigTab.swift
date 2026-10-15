@@ -6,9 +6,11 @@ struct SystemMessageConfigTab: View {
     @Binding var tokenCount: Int
     
     var body: some View {
+        let baseSize = appState.modelConfig?.appSettings.fontSize ?? 14.0
         Form {
             Section("System Message") {
                 TextEditor(text: $systemMessage)
+                    .font(.system(size: baseSize))
                     .frame(height: 400)
                     .listRowSeparator(.hidden)
                     .scrollContentBackground(.hidden)

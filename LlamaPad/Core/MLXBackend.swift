@@ -1,7 +1,9 @@
 import Foundation
+import CoreImage
 import Combine
 import MLXLMCommon
 import MLXLLM
+import MLXVLM
 import MLXLMTransformers
 import MLX
 
@@ -15,19 +17,22 @@ private func logMemoryUsage(_ prefix: String) {
 private struct SessionSignature: Equatable {
     let system: String?
     let messages: [String]
-    
-    //NOTE: Only deals with text and does not check images/video
-    static func createChatSessionSignature(instruction: String?, messages: [Chat.Message]) -> Self {
+    let attachmentIDs: [UUID]
+
+    static func createChatSessionSignature(instruction: String?, messages: [Chat.Message], attachmentIDs: [UUID] = []) -> Self {
         let strings: [String] = messages.map(\.content)
         return Self.init(
             system: instruction,
-            messages: strings)
+            messages: strings,
+            attachmentIDs: attachmentIDs,
+        )
     }
     
     /// checks to see if the session signatures are considered equal without change
     func checkSignature(against other: Self) -> Bool {
         system == other.system
             && messages.prefix(other.messages.count).elementsEqual(other.messages)
+            && attachmentIDs.prefix(other.attachmentIDs.count).elementsEqual(other.attachmentIDs)
     }
 }
 
@@ -39,6 +44,9 @@ class MLXBackend: InferenceBackend {
     
     /// this is the cached ChatSessiont that can be reused if SessionSignature checks out
     private var chatSession: ChatSession? = nil
+    
+    /// keeps track of the task used for generation so that it can be cancelled if needed.
+    private var generationTask: Task<Void, Never>?
     
     /// this is used to test against the current messages the client wishes to send to the
     /// backend to see if a new ChatSession needs to get created because messages changed.
@@ -56,6 +64,9 @@ class MLXBackend: InferenceBackend {
     /// For example, regenerating the last message several times would just report more and more tokens used in
     /// the cache space, which would be inaccurate. Instead, we just disable this number for this backend.
     var lastPromptTokenCount: Int? { nil }
+
+    private var internalLastIncludedMessageIDs: [UUID]? = nil
+    var lastIncludedMessageIDs: [UUID]? { internalLastIncludedMessageIDs }
 
     /// used by `prepareMessageForBackend` to figure out where to start the message log
     /// to send to the backend engine. that way we can constrict the log a little more, pin it to start
@@ -105,9 +116,22 @@ class MLXBackend: InferenceBackend {
         // do the actual model loading
         let modelDirectoryURL = activatedURLS.first!
         
-        // NOTE: only works because of the swift-transformers adapter library `swift-transformers-mlx`
-        // providing easier to use tokenizer from that library.
-        loadedModel = try await loadModelContainer(from: modelDirectoryURL)
+        do {
+            // try forcing the VLM pipeline to see if it works, and fall back
+            // to text-only implementation in the catch block if needed.
+            print("Attempting to load as VLM ...")
+            loadedModel = try await VLMModelFactory.shared.loadContainer(from: modelDirectoryURL)
+        } catch ModelFactoryError.unsupportedModelType {
+            // NOTE: only works because of the swift-transformers adapter library `swift-transformers-mlx`
+            // providing easier to use tokenizer from that library.
+            print("Not a VLM; now attempting to load as text-only LLM ...")
+            loadedModel = try await loadModelContainer(from: modelDirectoryURL)
+        } catch {
+            print("VLM load failed with error type: \(type(of: error))")
+            print("VLM load error: \(error)")
+            throw error
+        }
+        
         loadedConfig = config
         logMemoryUsage("Memory usage after loading")
     }
@@ -134,6 +158,11 @@ class MLXBackend: InferenceBackend {
         return tokenCount
     }
     
+    func cancel() async {
+        generationTask?.cancel()
+        generationTask = nil
+    }
+    
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
@@ -157,7 +186,6 @@ class MLXBackend: InferenceBackend {
         }
         
         // we go through and select only the messages that fit within a given context log.
-        // NOTE: for the MLX backend, we don't have a sliding context window yet
         prunedMessages = await prepareMessagesForBackend(
             messages: prunedMessages,
             systemMessage: systemMessage,
@@ -167,17 +195,44 @@ class MLXBackend: InferenceBackend {
         // build the chat history
         var mlxMessages = [Chat.Message]()
         mlxMessages = prunedMessages.compactMap { msg -> Chat.Message? in
-            let content = msg.parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = msg.contentWithAttachments
             guard !content.isEmpty else { return nil }
-            return Chat.Message(role: msg.sender == .user
-                                ? Chat.Message.Role.user
-                                : Chat.Message.Role.assistant,
-                                content: content)
+            
+            let images: [UserInput.Image] = (msg.attachments ?? [])
+                .filter { $0.contentType == .image }
+                .compactMap { att in
+                    guard let data = att.imageData,
+                          let ciImage = CIImage(data: data) else { return nil }
+                    return .ciImage(ciImage)
+                }
+         
+            return Chat.Message(
+                role: msg.sender == .user ? Chat.Message.Role.user : Chat.Message.Role.assistant,
+                content: content,
+                images: images
+            )
         }
                 
+        // gather attachment IDs from the app-level messages in the same order
+        let historyAttachmentIDs: [UUID] = prunedMessages.flatMap {
+            $0.attachments?.filter { $0.contentType == .image }.map(\.id) ?? []
+        }
+
         // create a new signature to check against our last signature for the session
-        let newSessionSignature = SessionSignature.createChatSessionSignature(instruction: systemMessage, messages: mlxMessages)
+        let newSessionSignature = SessionSignature.createChatSessionSignature(
+            instruction: systemMessage,
+            messages: mlxMessages,
+            attachmentIDs: historyAttachmentIDs
+        )
+        
+        // reseed the RNG if necessary
+        if lastSeed == nil || lastSeed == 0 || settings.samplerSettings.magic_seed != lastSeed {
+            let seed = settings.samplerSettings.magic_seed == 0
+                ? UInt64(Date.timeIntervalSinceReferenceDate * 1000)
+                : UInt64(settings.samplerSettings.magic_seed)
+            MLX.seed(seed)
+            lastSeed = settings.samplerSettings.magic_seed
+        }
         
         // check to see if we need to create a new session
         if chatSession == nil || !(chatSessionSignature?.checkSignature(against: newSessionSignature) ?? false) {
@@ -210,16 +265,7 @@ class MLXBackend: InferenceBackend {
             if let session = chatSession {
                 // we're going to reuse the session, but we need to remove any system messages in the history we're using
                 session.instructions = nil
-                
-                // reseed the RNG if necessary
-                if lastSeed == nil || settings.samplerSettings.magic_seed != lastSeed {
-                    let seed = settings.samplerSettings.magic_seed == 0
-                        ? UInt64(Date.timeIntervalSinceReferenceDate * 1000)
-                    : UInt64(settings.samplerSettings.magic_seed)
-                    MLX.seed(seed)
-                    lastSeed = settings.samplerSettings.magic_seed
-                }
-             
+                             
                 // also make sure to update the sampler settings
                 session.generateParameters.maxTokens = settings.maxTokens > 0 ? settings.maxTokens : nil
                 session.generateParameters.temperature = settings.samplerSettings.temperature
@@ -236,13 +282,25 @@ class MLXBackend: InferenceBackend {
             }
         }
         
-        // This returns AsyncThrowingStream<String, Error>
-        // but we need it to be AsyncThrowingStream<GenerationChunk, Error> ...
-        let mlxStream = chatSession!.streamDetails(to: targetMsg?.parsedContent.responseContent ??
-                                              "Tell the user the software they use is bugged because the AI cannot see the message to respond to.",
-                                              images: [], videos: [])
+        // Extract image attachments from the target message
+        var targetImages: [UserInput.Image] = []
+        if let attachments = targetMsg?.attachments {
+            for att in attachments where att.contentType == .image {
+                if let data = att.imageData, let ciImage = CIImage(data: data) {
+                    targetImages.append(.ciImage(ciImage))
+                }
+            }
+        }
+
+        let promptText = targetMsg?.contentWithAttachments ??
+            "Tell the user the software they use is bugged because the AI cannot see the message to respond to."
+
+        let mlxStream = chatSession!.streamDetails(
+            to: promptText,
+            images: targetImages,
+            videos: []
+        )
         
-        // So we just wrap it in this AsyncThrowingStream...
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -298,17 +356,28 @@ class MLXBackend: InferenceBackend {
                         }
                         updatedMessages.append(userContent)
                         updatedMessages.append(assistantContent)
+
+                        var updatedAttachmentIDs = historyAttachmentIDs
+                        updatedAttachmentIDs += target.attachments?
+                            .filter { $0.contentType == .image }.map(\.id) ?? []
+
                         self.chatSessionSignature = SessionSignature(
                             system: systemMessage,
-                            messages: updatedMessages
+                            messages: updatedMessages,
+                            attachmentIDs: updatedAttachmentIDs
                         )
                     }
                     
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: InferenceError.generationFailed(error.localizedDescription))
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: InferenceError.generationFailed(error.localizedDescription))
+                    }
                 }
             }
+            self.generationTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }
@@ -323,6 +392,7 @@ class MLXBackend: InferenceBackend {
         // for now, estimate how many tokens the prompt format adds
         let promptTokenBaggageEst = 10
         
+        internalLastIncludedMessageIDs = []
         guard let config = loadedConfig else { return messages }
         guard loadedModel != nil else { return messages }
         
@@ -342,12 +412,17 @@ class MLXBackend: InferenceBackend {
         var safetyThresholdBreached = false
         
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
-            let content = messages[i].parsedContent.responseContent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = messages[i].contentWithAttachments
             guard !content.isEmpty else { continue }
             
-            let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
-            
+            var msgTokens = await countTokens(for: content) + promptTokenBaggageEst
+            if messages[i].sender == .user, let attachments = messages[i].attachments {
+                let imageTokens = attachments
+                    .filter { $0.contentType == .image }
+                    .reduce(0) { $0 + $1.tokenEstimate }
+                msgTokens += imageTokens
+            }
+
             if totalTokens + msgTokens > safetyThreshold {
                 safetyThresholdBreached = true
                 startIndex = i + 1
@@ -367,10 +442,17 @@ class MLXBackend: InferenceBackend {
         
         if safetyThresholdBreached {
             while startIndex < messages.count && totalTokens > limitWithRunway {
-                let content = messages[startIndex].parsedContent.responseContent
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let content = messages[startIndex].contentWithAttachments
                 let msgTokens = await countTokens(for: content) + promptTokenBaggageEst
                 totalTokens -= msgTokens
+                
+                if messages[startIndex].sender == .user, let attachments = messages[startIndex].attachments {
+                    let imageTokens = attachments
+                        .filter { $0.contentType == .image }
+                        .reduce(0) { $0 + $1.tokenEstimate }
+                    totalTokens -= imageTokens
+                }
+
                 startIndex += 1
             }
         }
@@ -383,7 +465,10 @@ class MLXBackend: InferenceBackend {
             print("ERROR: startIndex out of bounds for prepareMessagesForBackend; returning empty array.")
             return []
         }
-        return Array(messages[startIndex...])
+        
+        let result = Array(messages[startIndex...])
+        internalLastIncludedMessageIDs = result.map { $0.id }
+        return result
     }
 
 }

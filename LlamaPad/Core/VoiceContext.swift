@@ -4,6 +4,7 @@ import AVFoundation
 import Combine
 import MLXAudioTTS
 import MLXAudioCore
+import MLXLMCommon
 
 enum VoiceError: LocalizedError {
     case noVoiceTensor
@@ -26,13 +27,13 @@ class VoiceContext: ObservableObject {
     @Published var isPlaying = false
     @Published var isReady = false
     @Published var lastError: String?
-    @Published var interruptRequested  = false
+    private var producerTask: Task<Void, Never>?
 
     /// this tracks the currently played message, if the data is provided
     @Published var speakingMessageID: UUID?
 
     /// this should be set to true while the models are loading
-    private var isLoadingModel = false
+    @Published var isLoadingModel = false
     
     private let audioEngine: AVAudioEngine!
     private let playerNode: AVAudioPlayerNode!
@@ -74,7 +75,7 @@ class VoiceContext: ObservableObject {
         
         isReady = false
         isLoadingModel = true
-        interruptRequested = false
+        producerTask = nil
         defer {
             isLoadingModel = false
         }
@@ -94,6 +95,12 @@ class VoiceContext: ObservableObject {
                 chatter.cfgWeightOverride = cfg
             }
             tts = chatter
+        case .omnivoice:
+            let repoID = config.hfRepoId
+            guard !(repoID?.isEmpty ?? true) else {
+                throw VoiceError.notReady
+            }
+            tts = try await OmniVoiceModel.fromPretrained(repoID ?? "mlx-community/OmniVoice-bfloat16")
         }
         
         isReady = true
@@ -148,6 +155,7 @@ class VoiceContext: ObservableObject {
             throw VoiceError.notReady
         }
         
+        
         // tag this particular messageId as the one we're speaking, if supplied with the UUID
         speakingMessageID = messageId
         defer { speakingMessageID = nil }
@@ -163,8 +171,15 @@ class VoiceContext: ObservableObject {
         }
         
         // break the text string into 'paragraphs' by splitting at newlines and trimming
-        let paragraphs = text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).removingEmoji() }
+        var cleanedUp = text.removingEmoji()
+        if config.stripCodeBlocks {
+            cleanedUp = cleanedUp.removingCodeBlocks(replaceWith: config.codeBlockSkipMessage)
+        }
+        if config.stripMarkdown {
+            cleanedUp = cleanedUp.removingMarkdown()
+        }
+        let paragraphs = cleanedUp.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         
         
@@ -195,47 +210,69 @@ class VoiceContext: ObservableObject {
         }
         
         // 'speak' each of them separately so as to *hopefully* not overwhelm the TTS
-        interruptRequested = false
-        for (i, paragraph) in paragraphs.enumerated() {
-            if interruptRequested { break }
-
-            // too heavy of a compute for the main actor...
-            let audio = try await Task.detached(priority: .utility) {
-                let result = try await tts.generate(
-                    text: paragraph,
-                    voice: !config.voice.isEmpty ? config.voice : nil,
-                    refAudio: refAudio,
-                    refText: refAudioText,
-                    language: !config.language.isEmpty ? config.language : nil,
-                )
-                
-                // without clearing the cache, it would appear that memory stacks up
-                // until it will cause crashes on iOS.
-                MLX.Memory.clearCache()
-                
-                return result
-            }.value
-
-            // wait for the playback to finish before starting the next paragraph
-            // but only if it's not the first time through the loop
-            if i > 0 {
-                while isPlaying && !interruptRequested {
-                    try await Task.sleep(nanoseconds: 100_000_000)
+        let (stream, continuation) = AsyncStream.makeStream(of: [Float].self)
+        
+        // Producer: generates audio as fast as possible
+        producerTask = Task.detached(priority: .utility) {
+            do {
+                for paragraph in paragraphs {
+                    if Task.isCancelled { break }
+                    
+                    var audio: MLXArray
+                    if let omni = tts as? OmniVoiceModel {
+                        var ovParams = switch config.voiceQuality ?? .standard {
+                            case .fast:
+                                OmniVoiceGenerateParameters.fast
+                            case .standard:
+                                OmniVoiceGenerateParameters()
+                            case .high:
+                                OmniVoiceGenerateParameters.highQuality
+                        }
+                        
+                        ovParams.speed = config.voiceSpeed ?? 1.0
+                        
+                        audio = try await omni.generate(
+                            text: paragraph,
+                            voice: !config.voice.isEmpty ? config.voice : nil,
+                            refAudio: refAudio,
+                            refText: refAudioText,
+                            language: !config.language.isEmpty ? config.language : nil,
+                            ovParameters: ovParams
+                        )
+                    } else {
+                        audio = try await tts.generate(
+                            text: paragraph,
+                            voice: !config.voice.isEmpty ? config.voice : nil,
+                            refAudio: refAudio,
+                            refText: refAudioText,
+                            language: !config.language.isEmpty ? config.language : nil
+                        )
+                    }
+                    
+                    MLX.Memory.clearCache()
+                    
+                    continuation.yield(Array(audio.asArray(Float.self)))
                 }
+            } catch {
+                continuation.finish()
+                return
             }
-            
-            if interruptRequested { break }
-
-            speakingMessageID = messageId
-
-            // hack to convert back to float array
-            let floatArray: [Float] = audio.asArray(Float.self)
-            try playBuffer(floatArray)
+            continuation.finish()
         }
         
-        // final delay to wait until the last message is finished playing
-        while isPlaying && !interruptRequested {
-            try await Task.sleep(nanoseconds: 100_000_000)
+        // Consumer: plays audio in order, waiting for each to finish
+        for try await audio in stream {
+            if producerTask?.isCancelled ?? false || speakingMessageID != messageId { break }
+            try playBuffer(audio)
+            
+            // wait for playback to complete
+            while isPlaying && !(producerTask?.isCancelled ?? false) && speakingMessageID == messageId {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+        }
+        
+        if let task = producerTask {
+            await task.value
         }
     }
     
@@ -285,7 +322,7 @@ class VoiceContext: ObservableObject {
     func stopPlaying() {
         playerNode.stop()
         audioEngine.stop()
-        interruptRequested = true
+        producerTask?.cancel()
         isPlaying = false
         speakingMessageID = nil
     }
@@ -295,7 +332,7 @@ class VoiceContext: ObservableObject {
         tts = nil
         isReady = false
         isPlaying = false
-        interruptRequested = true
+        producerTask = nil
         speakingMessageID = nil
         
         // release the sandbox hold on the files
@@ -315,5 +352,20 @@ extension String {
         )
         .replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespaces)
+    }
+    
+    func removingCodeBlocks(replaceWith: String) -> String {
+        return self.replacingOccurrences(
+            of: #"```[\s\S]*?```"#,
+            with: replaceWith,
+            options: .regularExpression)
+    }
+    
+    func removingMarkdown() -> String {
+        return self
+            .replacingOccurrences(of: #"`([^`]+)`"#, with: "$1", options: .regularExpression) // backquote
+            .replacingOccurrences(of: #"\*+"#, with: "", options: .regularExpression)  // italic
+            .replacingOccurrences(of: #"(?m)^#+\s+"#, with: "", options: .regularExpression) // heading
+            .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression) // urls
     }
 }

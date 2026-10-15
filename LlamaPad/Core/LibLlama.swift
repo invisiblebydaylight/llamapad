@@ -156,16 +156,14 @@ actor LlamaContext: Sendable {
         let sparams = llama_sampler_chain_default_params()
         sampling = llama_sampler_chain_init(sparams)
         
-        let n_ctx_train = llama_model_n_ctx_train(model)
-        
         llama_sampler_chain_add(sampling, llama_sampler_init_penalties(
+            llama_vocab_n_tokens(vocab),
             settings.repeatLastN,
             settings.repeatPenalty,
             settings.freqPenalty,
             settings.presencePenalty))
         llama_sampler_chain_add(sampling, llama_sampler_init_dry(
             vocab,
-            n_ctx_train,
             settings.dryMultiplier,
             settings.dryBase,
             settings.dryAllowedLen,
@@ -224,9 +222,6 @@ actor LlamaContext: Sendable {
             return try autoreleasepool {
                 var model_params = llama_model_default_params()
                 model_params.n_gpu_layers = offloadCount
-                
-                model_params.use_mmap = true
-                model_params.use_mlock = false
                 
 #if targetEnvironment(simulator)
                 // simulators don't support Metal

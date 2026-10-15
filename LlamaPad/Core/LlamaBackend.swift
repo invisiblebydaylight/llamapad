@@ -16,11 +16,17 @@ class LlamaBackend : InferenceBackend {
     /// track security access for it.
     private var currentModelURLs: [URL] = []
     
+    /// keeps track of the task used for generation so that it can be cancelled if needed.
+    private var generationTask: Task<Void, Never>?
+    
     /// tracks the first message to be included in the prompt allowing some maintenance
     /// of KV cache stability so that constant prompt ingestion doesn't have to happen.
     private var contextAnchorID: UUID?
     
     private var internalLastPromptTokenCount: Int? = nil
+    
+    private var internalLastIncludedMessageIDs: [UUID]? = nil
+    var lastIncludedMessageIDs: [UUID]? { internalLastIncludedMessageIDs }
 
     var isLoaded: Bool { llamaContext != nil }
     var contextLimit: Int { Int(llamaContext?.contextLength ?? 0) }
@@ -130,6 +136,11 @@ class LlamaBackend : InferenceBackend {
         return tokens
     }
     
+    func cancel() async {
+        generationTask?.cancel()
+        generationTask = nil
+    }
+    
     func generate(messages: [Message],
                   systemMessage: String?,
                   isContinuation: Bool,
@@ -199,9 +210,14 @@ class LlamaBackend : InferenceBackend {
 
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: error)
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
                 }
             }
+            self.generationTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }
@@ -217,6 +233,7 @@ class LlamaBackend : InferenceBackend {
                                           settings: GenerationSettings
     )
     async -> [(sender: MessageSender, content: String)] {
+        internalLastIncludedMessageIDs = []
         guard let llamaContext = llamaContext else { return [] }
         let contextLength = Int(llamaContext.contextLength)
         
@@ -255,7 +272,7 @@ class LlamaBackend : InferenceBackend {
 
         for i in stride(from: messages.count - 1, through: 0, by: -1) {
             let msg = messages[i]
-            let content = msg.parsedContent.responseContent
+            let content = msg.contentWithAttachments
             let msgTokens = await countTokens(for: content) + perMessageOverhead
             
             // if budget is exceeded, pin the window to the previous message
@@ -286,7 +303,7 @@ class LlamaBackend : InferenceBackend {
             // until we're under limitWithRunway. this creates the "gap" that
             // keeps the KV cache stable for several turns before we slide again.
             while newStartIndex < messages.count && totalTokens > limitWithRunway {
-                let content = messages[newStartIndex].parsedContent.responseContent
+                let content = messages[newStartIndex].contentWithAttachments
                 let msgTokens = await countTokens(for: content) + perMessageOverhead
                 totalTokens -= msgTokens
                 newStartIndex += 1
@@ -297,10 +314,13 @@ class LlamaBackend : InferenceBackend {
         if !messages.isEmpty && contextAnchorID != messages[newStartIndex].id {
             contextAnchorID = messages[newStartIndex].id
         }
+        
+        // capture the IDs of the messages we're including
+        internalLastIncludedMessageIDs = messages[newStartIndex...].map { $0.id }
 
         // convert our stable 'window' into the messageLog into the returned format
         return messages[newStartIndex...].compactMap { message in
-            let content = message.parsedContent.responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = message.contentWithAttachments
             guard !content.isEmpty else { return nil }
             return (sender: message.sender, content: content)
         }

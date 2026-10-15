@@ -203,11 +203,12 @@ struct MessageView: View {
                         Button(action: {
                             Task {
                                 guard appState.modelConfig != nil else { return }
+                                guard !voiceContext.isLoadingModel else { return }
                                 
                                 // if audio is already playing, then the button press stops it.
                                 // if audio was not playing, then the app attempts to 'speak' the message content,
                                 // and arms the button.
-                                if voiceContext.isPlaying {
+                                if voiceContext.isPlaying || armedButton == .Speak {
                                     voiceContext.stopPlaying()
                                     armedButton = .None
                                 } else {
@@ -243,7 +244,9 @@ struct MessageView: View {
         Group {
             if let stats = message.stats, showTray {
                 HStack(spacing: 8) {
-                    Label("\(stats.promptTps, specifier: "%.1f") t/s", systemImage: "bolt.fill")
+                    if let promptTps = stats.promptTps {
+                        Label("\(promptTps, specifier: "%.1f") t/s", systemImage: "bolt.fill")
+                    }
                     Label("\(stats.generationTps, specifier: "%.1f") t/s", systemImage: "sparkles")
                     
                     if let modelName = stats.modelName {
@@ -257,6 +260,22 @@ struct MessageView: View {
                 .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
             }
         }
+    }
+
+    private var MarkdownContent: some View {
+        let baseSize = appState.modelConfig?.appSettings.fontSize ?? 14.0
+        return MarkdownView(message.parsedContent.responseContent)
+            .font(.system(size: baseSize), for: .body)
+            .font(.system(size: baseSize * 0.85, design: .monospaced), for: .codeBlock)
+            .font(.system(size: baseSize * 0.9), for: .blockQuote)
+            .font(.system(size: baseSize, design: .serif), for: .inlineMath)
+            .font(.system(size: baseSize, design: .serif), for: .displayMath)
+            .font(.system(size: baseSize * 0.85, weight: .semibold), for: .tableHeader)
+            .font(.system(size: baseSize * 0.85), for: .tableBody)
+            .markdownMathRenderingEnabled()
+            .textSelection(.enabled)
+            .padding(12)
+            .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
     }
     
     private var MessageBubbleContent: some View {
@@ -276,7 +295,7 @@ struct MessageView: View {
                 VStack(spacing: 0) {
                     TextEditor(text: $draftContent)
                         .focused($isEditorFocused)
-                        .font(.body)
+                        .font(.system(size: appState.modelConfig?.appSettings.fontSize ?? 14.0))
                         .frame(minHeight: 40, maxHeight: 400)
                         .scrollContentBackground(.hidden)
                         .padding(8)
@@ -306,10 +325,7 @@ struct MessageView: View {
                 .cornerRadius(8)
                 .padding(4)
             } else {
-                MarkdownView(message.parsedContent.responseContent)
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .tint(message.sender == .user ? .black : .blue, for: .inlineCodeBlock)
+                MarkdownContent
             }
         }
         .background(message.sender == .user ?
@@ -341,6 +357,27 @@ struct MessageView: View {
         #endif
     }
     
+    private var AttachmentChips: some View {
+        Group {
+            if let attachments = message.attachments, !attachments.isEmpty {
+                LazyHStack(spacing: 6) {
+                    ForEach(attachments) { att in
+                        AttachmentChipView(
+                            attachment: att,
+                            onRemove: { removeAttachment(att) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+    
+    private func removeAttachment(_ attachment: Attachment) {
+        message.attachments?.removeAll { $0.id == attachment.id }
+        appState.saveChatLog()
+    }
+
+    
     var body: some View {
         HStack {
             HStack(alignment: .center, spacing: 0) {
@@ -349,12 +386,16 @@ struct MessageView: View {
                     Spacer()
                     SidecarTray
                         .padding(.trailing, 8)
-                    MessageBubbleContent
+                    VStack(alignment: .trailing, spacing: 4) {
+                        MessageBubbleContent
+                        AttachmentChips
+                    }
                 }
                 // ai message alignment
                 else {
                     VStack {
                         MessageBubbleContent
+                        AttachmentChips
                         StatsRibbon
                     }
                     SidecarTray
@@ -446,4 +487,15 @@ struct MessageView: View {
     }
 }
 
+extension MessageView: Equatable {
+    static func == (lhs: MessageView, rhs: MessageView) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.content == rhs.message.content &&
+        lhs.isTTSEnabled == rhs.isTTSEnabled &&
+        lhs.isEditing == rhs.isEditing &&
+        lhs.armedButton == rhs.armedButton &&
+        lhs.showTray == rhs.showTray &&
+        lhs.isThinkingExpanded == rhs.isThinkingExpanded
+    }
+}
 

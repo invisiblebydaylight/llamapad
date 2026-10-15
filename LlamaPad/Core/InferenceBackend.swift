@@ -20,6 +20,8 @@ enum InferenceError: Error, LocalizedError {
 struct GenerationSettings {
     let maxTokens: Int
     let enableThinking: Bool
+    let reasoningEffort: ReasoningEffort    // only for .remoteApi backend
+    let remoteSamplers: Set<String>         // only for .remoteApi backend
     let samplerSettings: SamplerSettings
     let reservedContextBuffer: Int
     let contextRunway: Int
@@ -35,6 +37,10 @@ protocol InferenceBackend: AnyObject {
     /// returns nil if no generation has occurred or the backend doesn't track it.
     var lastPromptTokenCount: Int? { get }
     
+    /// returns the message IDs that were included in the last prompt sent to the backend.
+    /// returns nil if no generation has occurred or the backend doesn't track it.
+    var lastIncludedMessageIDs: [UUID]? { get }
+
     func load(from config: AppConfiguration) async throws
     func unload() async
     func shutdown()
@@ -47,6 +53,8 @@ protocol InferenceBackend: AnyObject {
         isContinuation: Bool,
         settings: GenerationSettings
     ) async throws -> AsyncThrowingStream<GenerationChunk, Error>
+    
+    func cancel() async
 }
 
 struct GenerationChunk: Sendable {

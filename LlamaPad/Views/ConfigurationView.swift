@@ -53,6 +53,10 @@ struct ConfigurationView: View {
                 TTSConfigTab(appState: appState, draftConfig: draftConfig, showingError: $showingError, errorMessage: $errorMessage).tabItem {
                     Label("Voice", systemImage: "speaker.wave.3")
                 }
+                
+                InterfaceConfigTab(draftConfig: draftConfig).tabItem {
+                    Label("Interface", systemImage: "textformat")
+                }
             }
             .tabViewStyle(.automatic)
             .padding(.vertical, 8)
@@ -76,7 +80,7 @@ struct ConfigurationView: View {
                             Text("Save Changes")
                         }
                     }
-                    .disabled(draftConfig.modelPaths.isEmpty || appState.isBusy)
+                    .disabled(appState.isBusy || (draftConfig.isRemote ? draftConfig.apiEndpoint.isEmpty : draftConfig.modelPaths.isEmpty))
                     .buttonStyle(.borderedProminent)
                     .help(appState.isBusy ? "Cannot save changes while a model is being used..." : "Save all changes")
                 }
@@ -102,7 +106,9 @@ struct ConfigurationView: View {
         Task {
             let isModelReloadNeeded = draftConfig.requiresReload(comparedTo: appState.modelConfig)
             let isVoiceReloadNeeded = appState.modelConfig == nil ||
-                (draftConfig.tts.modelDirectory != appState.modelConfig!.tts.modelDirectory)
+                draftConfig.tts.engine != appState.modelConfig!.tts.engine ||
+                draftConfig.tts.modelDirectory != appState.modelConfig!.tts.modelDirectory ||
+                draftConfig.tts.hfRepoId != appState.modelConfig!.tts.hfRepoId
             
             appState.modelConfig = AppConfiguration(draftConfig)
             do {

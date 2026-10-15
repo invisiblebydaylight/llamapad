@@ -37,6 +37,8 @@ class AppState: ObservableObject {
     /// describes the current processing task (e.g. "Processing Prompt...")
     @Published var processingStatus: String? = nil  
 
+    @Published var lastIncludedMessageIDs: [UUID]? = nil
+    
     /// a callback that gets called on completion, if supplied, with the new message that was generated.
     /// this callback is skipped if the generation is cancled by the user with `shouldStopGenerating`
     var onGenerationFinished: ((Message) -> Void)?
@@ -106,8 +108,10 @@ class AppState: ObservableObject {
         // spawn the correct concrete backend
         let newBackend: InferenceBackend = if config.backendType == .llamaCPP {
             LlamaBackend()
-        } else {
+        } else if config.backendType == .mlx {
             MLXBackend()
+        } else {
+            RemoteAPIBackend()
         }
         
         do {
@@ -146,12 +150,14 @@ class AppState: ObservableObject {
     func selectConversation(_ id: UUID?) {
         self.currentConversationID = id
         self.messageLog = []
+        self.lastIncludedMessageIDs = nil
 
         // load the new conversation's chat log
         if let id = id {
             do {
                 let newLog = try ConversationService.loadChatLog(for: id)
                 self.messageLog = newLog
+                self.lastIncludedMessageIDs = Array(newLog.suffix(50).map { $0.id })
             } catch {
                 self.reportError("selectConversation: Faled to load the chatlog for conversation \(id): \(error.localizedDescription)")
             }
@@ -293,12 +299,17 @@ class AppState: ObservableObject {
                 settings: GenerationSettings (
                     maxTokens: modelConfig.maxGenerationLength,
                     enableThinking: modelConfig.enableThinking,
+                    reasoningEffort: modelConfig.apiReasoningEffort,
+                    remoteSamplers: modelConfig.apiEnabledSamplers,
                     samplerSettings: modelConfig.customSampler,
                     reservedContextBuffer: modelConfig.reservedContextBuffer,
                     contextRunway: modelConfig.contextRunway,
                     chatTemplate: modelConfig.chatTemplate
                 )
             )
+            
+            // store the message IDs that were included in the prompt sent out for generation.
+            self.lastIncludedMessageIDs = backend.lastIncludedMessageIDs
             
             // generate tokens and update UI incrementally
             self.reportProcessStatus(progress: nil, status: nil)
@@ -309,6 +320,7 @@ class AppState: ObservableObject {
                 // point at which we bail out of the prediction stream. upstream (hah!)
                 // code has to catch the termination and cancel the task to truly stop it.
                 if shouldStopGenerating {
+                    await backend.cancel()
                     break;
                 }
                 
@@ -338,7 +350,11 @@ class AppState: ObservableObject {
                 }
             }
         } catch {
-            reportError("Error generating response: \(error.localizedDescription)")
+            if shouldStopGenerating {
+                // ignore errors for this case
+            } else {
+                reportError("Error generating response: \(error.localizedDescription)")
+            }
             return
         }
 
@@ -346,19 +362,37 @@ class AppState: ObservableObject {
         let t_heat = Double(Int64(timeToFirstToken) - Int64(t_start)) / NS_PER_S
         let t_end = DispatchTime.now().uptimeNanoseconds
         let t_generation = Double(t_end - timeToFirstToken) / NS_PER_S
-        let prompt_tps = Double(actualTokensProcessed) / t_heat
-        let generation_tps = Double(generatedTokens-1) / t_generation
+        let promptTps: Double?
+        if modelConfig.isRemote {
+            // We can't accurately measure server-side prefill speed from the client.
+            // t_heat includes network latency + thinking tokens + server queue time.
+            promptTps = nil
+        } else {
+            promptTps = actualTokensProcessed > 0 ? Double(actualTokensProcessed) / t_heat : 0
+        }
+        let generationTps = Double(generatedTokens-1) / t_generation
         
         // record the performance stats in the message
-        let modelName = modelConfig.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        let modelName: String
+        if modelConfig.isRemote {
+            modelName = modelConfig.apiModelName.isEmpty ? "api" : modelConfig.apiModelName
+        } else {
+            modelName = modelConfig.modelPaths.last?.split(separator: "/").last.map(String.init) ?? "unknown"
+        }
         aiMessage.stats = MessageStats(
-            modelName: modelName, promptTps: prompt_tps, generationTps: generation_tps
+            modelName: modelName,
+            promptTps: promptTps,
+            generationTps: generationTps
         )
         
         print("Info: Generation complete (\(modelName)):")
         print("  Time to first token: \(t_heat)s")
-        print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
-        print("  Generation speeds: \(generatedTokens) tokens ; \(generation_tps) t/s")
+        if let prompt_tps = promptTps {
+            print("  Prompt speeds: \(actualTokensProcessed) new tokens ; \(prompt_tps) t/s")
+        } else {
+            print("  Prompt tokens: \(actualTokensProcessed)")
+        }
+        print("  Generation speeds: \(generatedTokens) tokens ; \(generationTps) t/s")
         
         // make sure to serialize as the final step so nothing's lost
         saveChatLog()
@@ -366,8 +400,15 @@ class AppState: ObservableObject {
             touchConversation(id: id)
         }
         
-        // call the callback, but only if we didn't cancel it
+        
+        // call the callback and update model list, but only if we didn't cancel it
         if !self.shouldStopGenerating {
+            // update and persist the updated model use history to disk
+            modelConfig.addModelToProfileHistory()
+            if let config = self.modelConfig {
+                try? PersistenceService.saveConfiguration(config)
+            }
+
             self.onGenerationFinished?(aiMessage)
         }
     }

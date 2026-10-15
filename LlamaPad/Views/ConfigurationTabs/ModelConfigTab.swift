@@ -6,13 +6,110 @@ struct ModelConfigTab: View {
     @Binding var showingFilePicker: Bool
     
     @State private var isAdvSamplerExpanded = false
+    @State private var isRemoteSamplerExpanded = false
+    @State private var isCustomJSONExpanded = false
+    
     private let templateNames: [String] = LlamaBackend.BuiltinTemplateNames
     
     private var modelFilename: String {
         guard !draftConfig.modelPaths.isEmpty else { return "No model selected" }
         return URL(fileURLWithPath: draftConfig.modelPaths.first!).lastPathComponent
     }
+    
+    private struct SamplerDef {
+        let key: String
+        let label: String
+    }
+    
+    private let remoteSamplerDefinitions = [
+        SamplerDef(key: "temperature", label: "Temperature"),
+        SamplerDef(key: "top_p", label: "Top-P"),
+        SamplerDef(key: "top_k", label: "Top-K"),
+        SamplerDef(key: "min_p", label: "Min-P"),
+        SamplerDef(key: "frequency_penalty", label: "Frequency Penalty"),
+        SamplerDef(key: "presence_penalty", label: "Presence Penalty"),
+        SamplerDef(key: "repeat_penalty", label: "Repetition Penalty"),
+        SamplerDef(key: "dry_multiplier", label: "DRY Multiplier"),
+        SamplerDef(key: "xtc_probability", label: "XTC Probability"),
+        SamplerDef(key: "xtc_threshold", label: "XTC Threshold"),
+        SamplerDef(key: "seed", label: "Seed"),
+    ]
+    
+    private func samplerValueField(for def: SamplerDef) -> AnyView {
+        switch def.key {
+        case "temperature":
+            return AnyView(TextField("", value: $draftConfig.customSampler.temperature, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "top_p":
+            return AnyView(TextField("", value: $draftConfig.customSampler.topP, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "top_k":
+            return AnyView(TextField("", value: $draftConfig.customSampler.topK, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "min_p":
+            return AnyView(TextField("", value: $draftConfig.customSampler.minP, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "frequency_penalty":
+            return AnyView(TextField("", value: $draftConfig.customSampler.freqPenalty, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "presence_penalty":
+            return AnyView(TextField("", value: $draftConfig.customSampler.presencePenalty, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "repeat_penalty":
+            return AnyView(TextField("", value: $draftConfig.customSampler.repeatPenalty, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "dry_multiplier":
+            return AnyView(TextField("", value: $draftConfig.customSampler.dryMultiplier, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "xtc_probability":
+            return AnyView(TextField("", value: $draftConfig.customSampler.xtcProbability, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "xtc_threshold":
+            return AnyView(TextField("", value: $draftConfig.customSampler.xtcThreshold, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        case "seed":
+            return AnyView(TextField("", value: $draftConfig.customSampler.magic_seed, format: .number)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60))
+        default:
+            return AnyView(EmptyView())
+        }
+    }
 
+    private var activeProfileBinding: Binding<APIProfile>? {
+        guard let id = draftConfig.activeProfileId,
+              let idx = draftConfig.apiProfiles.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+        return Binding(
+            get: { draftConfig.apiProfiles[idx] },
+            set: { draftConfig.apiProfiles[idx] = $0 }
+        )
+    }
+
+    private func addProfile() {
+        let newProfile = APIProfile(name: "New Profile")
+        draftConfig.apiProfiles.append(newProfile)
+        draftConfig.activeProfileId = newProfile.id
+    }
+
+    private func deleteProfile() {
+        guard let id = draftConfig.activeProfileId,
+              let idx = draftConfig.apiProfiles.firstIndex(where: { $0.id == id }) else { return }
+        draftConfig.apiProfiles.remove(at: idx)
+        draftConfig.activeProfileId = draftConfig.apiProfiles.first?.id
+    }
+    
     var body: some View {
         let backend = draftConfig.backendType
         Form {
@@ -36,35 +133,112 @@ struct ModelConfigTab: View {
                     }
                     .pickerStyle(.segmented)
                 }
-             
+                
                 VStack {
-                    HStack {
-                        Text("Model File")
-                        
-                        Spacer()
-                        
-                        if draftConfig.modelPaths.isEmpty {
-                            Text(backend == .llamaCPP ? "GGUF File(s) Required..." : "MLX Model Directory...")
-                                .foregroundColor(Color(.systemRed))
-                                .italic()
-                        } else {
-                            Text(URL(fileURLWithPath: draftConfig.modelPaths.first!).lastPathComponent)
-                                .foregroundColor(.primary)
+                    if backend == .llamaCPP || backend == .mlx {
+                        HStack {
+                            Text("Model File")
+                            
+                            Spacer()
+                            
+                            if draftConfig.modelPaths.isEmpty {
+                                Text(backend == .llamaCPP ? "GGUF File(s) Required..." : "MLX Model Directory...")
+                                    .foregroundColor(Color(.systemRed))
+                                    .italic()
+                            } else {
+                                Text(URL(fileURLWithPath: draftConfig.modelPaths.first!).lastPathComponent)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Button("Browse...") {
+                                showingFilePicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            .fixedSize()
                         }
                         
-                        Button("Browse...") {
-                            showingFilePicker = true
+                        if draftConfig.requiresReload(comparedTo: appState.modelConfig) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text("Model settings changed and will reload upon save...").font(.caption)
+                            }
+                            .foregroundColor(.orange)
                         }
-                        .buttonStyle(.bordered)
-                        .fixedSize()
-                    }
-                    
-                    if draftConfig.requiresReload(comparedTo: appState.modelConfig) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text("Model settings changed and will reload upon save...").font(.caption)
+                    } else { // remote API config...
+                        HStack() {
+                            Picker("Profile", selection: $draftConfig.activeProfileId) {
+                                ForEach(draftConfig.apiProfiles) { profile in
+                                    Text(profile.name).tag(profile.id as UUID?)
+                                }
+                            }
+                            
+                            Button(action: addProfile) {
+                                Image(systemName: "plus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Create a new profile")
+
+                            Button(action: deleteProfile) {
+                                Image(systemName: "minus.circle.fill")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(draftConfig.apiProfiles.isEmpty || draftConfig.activeProfileId == nil)
+                            .help("Delete the active profile")
+                        }.padding(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
+
+                        if let binding = activeProfileBinding {
+                            HStack() {
+                                Text("Profile Name:")
+                                Spacer()
+                                TextField("", text: binding.name)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The user friendly name for this group of settings.")
+                            }
+                            HStack() {
+                                Text("API Endpoint:")
+                                Spacer()
+                                TextField("", text: binding.endpoint)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The URL to the server that will be used to generate text.")
+                            }
+                            HStack() {
+                                Text("API Key:")
+                                Spacer()
+                                SecureField("", text: binding.apiKey)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The key needed to authenticate with the server, if any.")
+                            }
+                            HStack() {
+                                Text("Model Name:")
+                                Spacer()
+                                TextField("", text: binding.modelName)
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth:200, maxWidth:300)
+                                    .help("The model name recognized by the server to use for text generation.")
+                                    .onKeyPress(.tab) {
+                                        if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
+                                            DispatchQueue.main.async {
+                                                binding.modelName.wrappedValue = suggestion
+                                            }
+                                        }
+                                        return .handled
+                                    }
+                            }
+                            if let suggestion = draftConfig.bestModelMatch(for: binding.modelName.wrappedValue) {
+                                HStack(){
+                                    Text("Tab to complete: \(suggestion)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
-                        .foregroundColor(.orange)
                     }
                 }
                 
@@ -73,16 +247,16 @@ struct ModelConfigTab: View {
                         Text("Layers To Offload")
                         TextField("", value: $draftConfig.layerCountToOffload, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.layerCountToOffload, in: 0...200, step: 1)
+                        Stepper("", value: $draftConfig.layerCountToOffload, in: 0...1000, step: 1)
                             .labelsHidden()
                     }
                 }
-
+                
                 HStack {
                     Text("Context Length")
                     TextField("", value: $draftConfig.contextLength, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.contextLength, in: 4096...(64*1024), step: 1024)
+                    Stepper("", value: $draftConfig.contextLength, in: 4096...Int.max, step: 1024)
                         .labelsHidden()
                 }
                 
@@ -90,7 +264,7 @@ struct ModelConfigTab: View {
                     Text("Max Generation Length")
                     TextField("", value: $draftConfig.maxGenerationLength, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.maxGenerationLength, in: 0...(64*1024), step: 128)
+                    Stepper("", value: $draftConfig.maxGenerationLength, in: 0...Int.max, step: 128)
                         .labelsHidden()
                 }
                 
@@ -112,118 +286,207 @@ struct ModelConfigTab: View {
                     }
                 }
                 
-                HStack {
-                    Toggle("Enable Reasoning", isOn: $draftConfig.enableThinking)
-                        .help("If supported by the model's chat template, this toggles the <think> block.")
-                        .disabled(draftConfig.chatTemplate != nil)
-                        .opacity(draftConfig.chatTemplate != nil ? 0.5 : 1.0)
+                if backend == .llamaCPP || backend == .mlx {
+                    HStack {
+                        Toggle("Enable Reasoning", isOn: $draftConfig.enableThinking)
+                            .help("If supported by the model's chat template, this toggles the <think> block.")
+                            .disabled(draftConfig.chatTemplate != nil)
+                            .opacity(draftConfig.chatTemplate != nil ? 0.5 : 1.0)
+                    }
+                }
+                
+                if backend == .remoteAPI {
+                    HStack {
+                        Text("Reasoning Effort")
+                        Spacer()
+                        Picker("", selection: Binding<ReasoningEffort>(
+                            get: { draftConfig.apiReasoningEffort },
+                            set: { newValue in
+                                draftConfig.apiReasoningEffort = newValue
+                            }
+                        )) {
+                            ForEach(ReasoningEffort.allCases, id: \.self) { effort in
+                                Text(effort.rawValue.capitalized).tag(ReasoningEffort?.some(effort))
+                            }
+                        }
+                    }
+                    HStack {
+                        DisclosureGroup(isExpanded: $isRemoteSamplerExpanded) {
+                            ForEach(remoteSamplerDefinitions, id: \.key) { def in
+                                HStack {
+                                    Toggle("", isOn: Binding(
+                                        get: { draftConfig.apiEnabledSamplers.contains(def.key) },
+                                        set: { isOn in
+                                            if isOn {
+                                                draftConfig.apiEnabledSamplers.insert(def.key)
+                                            } else {
+                                                draftConfig.apiEnabledSamplers.remove(def.key)
+                                            }
+                                       }
+                                    ))
+                                    .labelsHidden()
+                                    .frame(minHeight: 20)
+                                    
+                                    Text(def.label)
+                                    Spacer()
+
+                                    if draftConfig.apiEnabledSamplers.contains(def.key) {
+                                        samplerValueField(for: def)
+                                            .frame(height: 20)
+                                    }
+                                }
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        label: {
+                           Text("Remote Sampler Overrides")
+                               .onTapGesture {
+                                   withAnimation {
+                                       isRemoteSamplerExpanded.toggle()
+                                   }
+                               }
+                       }
+                    }
+                    HStack {
+                        DisclosureGroup(isExpanded: $isCustomJSONExpanded) {
+                            TextEditor(text: Binding(
+                                get: { activeProfileBinding?.wrappedValue.customBody ?? "" },
+                                set: { activeProfileBinding?.wrappedValue.customBody = $0.isEmpty ? nil : $0 }
+                            ))
+                            .font(.system(.body, design: .monospaced))
+                            .frame(minHeight: 100)
+                            .overlay(alignment: .topLeading) {
+                                if (activeProfileBinding?.wrappedValue.customBody ?? "").isEmpty {
+                                    Text("Custom JSON merged into request body...")
+                                        .font(.system(.body, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                        .allowsHitTesting(false)
+                                        .padding(.top, 8)
+                                        .padding(.leading, 4)
+                                }
+                            }
+                        }
+                        label: {
+                           Text("Remote Body JSON Overrides")
+                               .onTapGesture {
+                                   withAnimation {
+                                       isCustomJSONExpanded.toggle()
+                                   }
+                               }
+                       }
+
+                    }
                 }
             }
-
-            Section("Sampling") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Temperature")
-                        TextField("", value: $draftConfig.customSampler.temperature, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.temperature, in: 0.0...2.0, step: 0.01)
-                            .labelsHidden()
-                    }
-                    HStack {
-                        Text("Top-P")
-                        TextField("", value: $draftConfig.customSampler.topP, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.topP, in: 0.0...1.0, step: 0.01)
-                            .labelsHidden()
-                    }
-                    HStack {
-                        Text("Top-K")
-                        TextField("", value: $draftConfig.customSampler.topK, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.topK, in: 0...200)
-                            .labelsHidden()
-                    }
-                    HStack {
-                        Text("Min-P")
-                        TextField("", value: $draftConfig.customSampler.minP, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.minP, in: 0.0...1.0, step: 0.01)
-                            .labelsHidden()
+            
+            if backend == .llamaCPP || backend == .mlx {
+                Section("Sampling") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Temperature")
+                            TextField("", value: $draftConfig.customSampler.temperature, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.temperature, in: 0.0...2.0, step: 0.01)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("Top-P")
+                            TextField("", value: $draftConfig.customSampler.topP, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.topP, in: 0.0...1.0, step: 0.01)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("Top-K")
+                            TextField("", value: $draftConfig.customSampler.topK, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.topK, in: 0...Int32.max)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("Min-P")
+                            TextField("", value: $draftConfig.customSampler.minP, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.minP, in: 0.0...1.0, step: 0.01)
+                                .labelsHidden()
+                        }
                     }
                 }
             }
             
             DisclosureGroup(isExpanded: $isAdvSamplerExpanded) {
-                HStack {
-                    Text("Repetition Penalty")
-                    TextField("", value: $draftConfig.customSampler.repeatPenalty, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.repeatPenalty, in: 0.5...2.0, step: 0.01)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("Repetition Penalty Length")
-                    TextField("", value: $draftConfig.customSampler.repeatLastN, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.repeatLastN, in: 64...4096, step: 64)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("Presence Penalty")
-                    TextField("", value: $draftConfig.customSampler.presencePenalty, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.presencePenalty, in: -2.0...2.0, step: 0.1)
-                        .labelsHidden()
-                }
-                HStack {
-                    Text("Frequency Penalty")
-                    TextField("", value: $draftConfig.customSampler.freqPenalty, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.freqPenalty, in: -2.0...2.0, step: 0.1)
-                        .labelsHidden()
-                }
-                if backend == .llamaCPP {
+                if backend == .llamaCPP || backend == .mlx {
                     HStack {
-                        Text("DRY Multiplier")
-                        TextField("", value: $draftConfig.customSampler.dryMultiplier, format: .number)
+                        Text("Repetition Penalty")
+                        TextField("", value: $draftConfig.customSampler.repeatPenalty, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.dryMultiplier, in: 0.0...2.0, step: 0.1)
+                        Stepper("", value: $draftConfig.customSampler.repeatPenalty, in: 0.5...2.0, step: 0.01)
                             .labelsHidden()
                     }
                     HStack {
-                        Text("XTC Probability")
-                        TextField("", value: $draftConfig.customSampler.xtcProbability, format: .number)
+                        Text("Repetition Penalty Length")
+                        TextField("", value: $draftConfig.customSampler.repeatLastN, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.xtcProbability, in: 0.0...1.0, step: 0.01)
+                        Stepper("", value: $draftConfig.customSampler.repeatLastN, in: 0...Int32.max, step: 64)
                             .labelsHidden()
                     }
                     HStack {
-                        Text("XTC Threshold")
-                        TextField("", value: $draftConfig.customSampler.xtcThreshold, format: .number)
+                        Text("Presence Penalty")
+                        TextField("", value: $draftConfig.customSampler.presencePenalty, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.xtcThreshold, in: 0.0...0.5, step: 0.01)
+                        Stepper("", value: $draftConfig.customSampler.presencePenalty, in: -2.0...2.0, step: 0.1)
                             .labelsHidden()
                     }
                     HStack {
-                        Text("XTC Minimum Kept")
-                        TextField("", value: $draftConfig.customSampler.xtcMinKeep, format: .number)
+                        Text("Frequency Penalty")
+                        TextField("", value: $draftConfig.customSampler.freqPenalty, format: .number)
                             .multilineTextAlignment(.trailing)
-                        Stepper("", value: $draftConfig.customSampler.xtcMinKeep, in: 0...10, step: 1)
+                        Stepper("", value: $draftConfig.customSampler.freqPenalty, in: -2.0...2.0, step: 0.1)
                             .labelsHidden()
                     }
-                }
-                HStack {
-                    Text("Magic Seed")
-                    TextField("", value: $draftConfig.customSampler.magic_seed, format: .number)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.customSampler.magic_seed)
-                        .labelsHidden()
+                    if backend == .llamaCPP {
+                        HStack {
+                            Text("DRY Multiplier")
+                            TextField("", value: $draftConfig.customSampler.dryMultiplier, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.dryMultiplier, in: 0.0...2.0, step: 0.1)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("XTC Probability")
+                            TextField("", value: $draftConfig.customSampler.xtcProbability, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.xtcProbability, in: 0.0...1.0, step: 0.01)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("XTC Threshold")
+                            TextField("", value: $draftConfig.customSampler.xtcThreshold, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.xtcThreshold, in: 0.0...0.5, step: 0.01)
+                                .labelsHidden()
+                        }
+                        HStack {
+                            Text("XTC Minimum Kept")
+                            TextField("", value: $draftConfig.customSampler.xtcMinKeep, format: .number)
+                                .multilineTextAlignment(.trailing)
+                            Stepper("", value: $draftConfig.customSampler.xtcMinKeep, in: 0...10, step: 1)
+                                .labelsHidden()
+                        }
+                    }
+                    HStack {
+                        Text("Magic Seed")
+                        TextField("", value: $draftConfig.customSampler.magic_seed, format: .number)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $draftConfig.customSampler.magic_seed, in:0...UInt32.max)
+                            .labelsHidden()
+                    }
                 }
                 HStack {
                     Text("Reserved Context Buffer")
                     TextField("", value: $draftConfig.reservedContextBuffer, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.reservedContextBuffer, in: 128...4096, step: 128)
+                    Stepper("", value: $draftConfig.reservedContextBuffer, in: 0...Int.max, step: 256)
                         .labelsHidden()
                         .opacity(draftConfig.maxGenerationLength > 0 ? 0.5 : 1.0)
                         .disabled(draftConfig.maxGenerationLength > 0) // only is effective if no max generation length set
@@ -232,7 +495,7 @@ struct ModelConfigTab: View {
                     Text("Context Runway")
                     TextField("", value: $draftConfig.contextRunway, format: .number)
                         .multilineTextAlignment(.trailing)
-                    Stepper("", value: $draftConfig.contextRunway, in: 128...4096, step: 128)
+                    Stepper("", value: $draftConfig.contextRunway, in: 0...Int.max, step: 256)
                         .labelsHidden()
                 }
                 
@@ -247,7 +510,7 @@ struct ModelConfigTab: View {
                         }.pickerStyle(.menu)
                     }
                 }
-             
+                
                 // Reset Advanced button
                 Button("Reset Advanced to Defaults") {
                     draftConfig.customSampler = SamplerSettings()
@@ -256,7 +519,7 @@ struct ModelConfigTab: View {
                 .buttonStyle(.borderless)
                 .foregroundColor(.blue)
                 .font(.caption)
-
+                
             } label: {
                 Text("Advanced Settings")
                     .onTapGesture {

@@ -1,6 +1,6 @@
-# llamapad (v0.3.0)
+# llamapad (v0.4.0)
 
-A native MacOS and iOS chat application for local LLM inference, built on top of [llama.cpp](https://github.com/ggml-org/llama.cpp/) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Everything runs on-device. The app is sandboxed with access only to the files you select. Network access is optional and only used for features you explicitly enable (Currently: Text-to-Speech setup). No microphone use.
+A native MacOS and iOS chat application for local and remote LLM inference, built on top of [llama.cpp](https://github.com/ggml-org/llama.cpp/) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm). Local models run entirely on-device. The app is sandboxed with access only to the files you select. Network access is optional and only used for features you explicitly enable (Currently: Text-to-Speech setup for some models and the remote API backend). No microphone use.
 
 Features conversation management, Jinja template support, text-to-speech
 and a privacy-first design philosophy.
@@ -35,17 +35,32 @@ finishes generating it will attempt to speak it out loud using TTS.
 
 
 ## Features
+* Added beta support for OmniVoice TTS voice designing and cloning. The library only lets you load this model
+  from HF cache, so it unfortunately must download from HF to the HF cache if it doesn't exist there already - it does
+  this in the background silently.
 * Embedded [llama.cpp](https://github.com/ggml-org/llama.cpp/) library for native text generation.
 * Embedded [MLX](https://github.com/ml-explore/mlx-swift-lm) library for native Apple Silicon support.
+* OpenAI-compatible remote API backend for connecting to cloud services (e.g. OpenRouter) or self-hosted servers (e.g. llama.cpp server, llama-swap).
 * AI chat interface with customizable sampler settings and basic model configuration options.
 * Text-to-speech support for AI messages, including an auto-play mode to automatically speak the generated messages.
 * Edit, regenerate, delete, continuation and generation of new responses are all supported.
 * Simple, but effective use of the KV cache to keep prompt processing to a minimum for GGUF models.
 * Basic conversation based workflow, supporting many chatlogs.
 * Jinja support for prompt formatting using the [swift-jinja](https://github.com/huggingface/swift-jinja) library.
-
+* File and image attachements: attach text files and images to user messages via the attachment button, copy/paste or drag and drop. Text file contents are injected into the message for all backendds; currently only the remote API backend attaches images and sends them as base64-encoded content.
 
 ### Recent changes (newer to older):
+* Application Settings as a new tab in the configuration window. Currently you can change the font size used for the
+  chatlog in the app and you can toggle auto-scroll behavior (enabled by default).
+* Smart auto-scrolling during response generation: the chatlog automatically follows incoming text,
+  but disengages the moment the user scrolls up. Scrolling back down re-engages it (though that behavior might
+  change in the future, depending on feedback).
+* Added support for OmniVoice TTS, though it is download-only via internal HF libraries for now, depending on upstream library.
+* Drag and drop support: drag text or image files onto the input bar at the bottom of the app to attach them.
+* File attachements: attach text and image files to user messages; contents are injected into the prompt at the start of the message. Large file warnings prevent accidental context window exhaustion. Images are added as base64 encodes and are currently supported by the remote API and MLX backends.
+* Added support for only showing the number of messages in the chatlog as were sent to the LLM, showing just how much the AI is able to see of the conversation with current settings. Scrolling all the way to the top shows a button that can reveal all messages.
+* Added cmd-uparrow and cmd-downarrow as two keyboard shortcuts that with the chatlog selected will navigate to the start and end.
+* Support for remote API usage through OpenAI-compatible endpoints has been added for maximum flexibility! While it's probably obvious, note that using this backend *does* send your chatlog to whatever server you supply as an endpoint.
 * Support for TTS has been changed to the [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) library, which supports a number of TTS engines. This means that support for multiple engines will be enabled. Currently there is: [Kokoro](https://huggingface.co/mlx-community/Kokoro-82M-bf16), [Qwen3-TTS](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) (Base, CustomVoice and VoiceDesigner) and Chatterbox ([Chatterbox-Turbo](https://huggingface.co/mlx-community/chatterbox-turbo-fp16) seems to work better than the full version).
 * Support for MLX models has landed! It might still be rough around the edges as it's a new backend. To support having a new backend implementation, a common protocol has been developed and utilized.
 * Performance metrics are now recorded for each message and shown on mouse hover (macOS) or swipe (iOS).
@@ -105,6 +120,28 @@ Qwen3 TTS Usage Guide:
 * When using one of Qwen3-TTS's custom voices (CustomVoice model), set the Voice Description and reference one of the speaker names; do not set Reference Audio or Reference Text.
 * When using the voice designer (VoiceDesign model), set the Voice Description but do not set Reference Audio or Reference Text.
 
+#### OmniVoice
+Only the bfloat16 and possibly the original f32 versions ot his model from `mlx-community` will work because 
+they're the only complete conversions. Additionally, the library used for all of the AI audio features does not allow for this
+model to be loaded from file so the app is forced to consume it from the HuggingFace ecosystem. If the model id is not 
+already cached, then it will be downloaded on first use, which might take some time. 
+
+[Editor's note: There's currently no UI for this. If you like the way this works better or otherwise have an opinion,
+start a Discussion or raise an issue.] 
+
+
+### Remote API Setup
+
+Multiple profiles are supported to facilitate quick switching between providers. Configure the remote API backend in the Model tab by selecting "api" as the backend type. Then add a new **profile** by clicking the plus button on the 'Profile' picker row. Once created, the new profile needs the following things set:
+
+* Endpoint URL: The base URL of an OpenAI-compatible API endpoint (e.g. `https://openrouter.ai/api/v1` or `http://localhost:8080/v1`).
+* API Key: Bearer token for authentication. May be left blank for local servers that don't require authentication.
+* Model Name: The model identifier expected by the endpoint (e.g. `google/gemma-4-31b-it`).
+
+The remote backend uses the same context windowing strategy as local backends (anchored sliding window with runway) to maintain prompt prefix stability, which helps with server-side prompt caching and reduces re-processing costs on endpoints that support it.
+
+Note: Plain HTTP connections to local addresses (`localhost`, `127.0.0.1`, `.local`) are supported via App Transport Security exceptions. Remote endpoints should use HTTPS.
+
 
 ## Known Limitations
 
@@ -117,6 +154,14 @@ Qwen3 TTS Usage Guide:
   There are currently no guard rails on what size models you can load; with great power
   comes great responsibility.
 * The MLX models don't support continuing partially generated messages natively unlike the llama.cpp backend.
+* Token counting for the remote API backend uses a heuristic estimate (~4 characters per token) rather 
+  than a real tokenizer. The context windowing logic is tolerant of this imprecision, but the token usage 
+  display may be slightly inaccurate until the first response is received and actual usage data is available.
+* The remote API backend does not support all sampler settings.
+* Self-signed HTTPS certificates are not currently supported for remote endpoints.
+  Use plain HTTP for local servers or a proper TLS certificate for remote servers.
+* Image attachments are supported by the remote API backend and MLX vision models. 
+  The llama.cpp backend does not yet support multimodal input.
 
 
 ## Future Goals
@@ -124,8 +169,7 @@ Qwen3 TTS Usage Guide:
 Eventually, if interest continues, this application will get more features developed to make it
 a more robust experience:
 
-* Tool call support ; MCP support
-* Backend expansion into remote OpenAI-compatible API endpoints for extra flexibility.
+* Tool call support ; MCP support for both local and remote backends.
 * Paralizable, batched requests that might be useful for behind-the-scenes agent stuff.
 * Multimodal input to send images to vision models and handle speech-to-text as well as text-to-speech.
 * Maybe even more inventive things like visualizing token logits at each step for illustration purposes
